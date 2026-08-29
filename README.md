@@ -218,4 +218,4 @@ Known limits:
 
 ## Licence
 
-LPPL 1.3c. See `LICENSE`.
+MIT. See `LICENSE`.

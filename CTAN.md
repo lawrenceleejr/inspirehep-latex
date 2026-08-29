@@ -10,7 +10,7 @@ Upload it at <https://ctan.org/upload> with:
 | --- | --- |
 | Package name | `inspirehep` |
 | Version | see `\ProvidesPackage` in `inspirehep.sty` |
-| Licence | `lppl1.3c` |
+| Licence | `mit` |
 | Summary | Live INSPIRE-HEP citation counts, references, and plots in LaTeX |
 | Suggested CTAN path | `/macros/latex/contrib/inspirehep` |
 | Topics | `bibtex-supp`, `cv`, `physics` |

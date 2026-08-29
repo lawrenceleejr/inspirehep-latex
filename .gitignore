@@ -10,6 +10,7 @@ inspirehep-data*.json
 
 # build products
 __pycache__/
+*.py[codz]
 inspirehep.pdf
 inspirehep.zip
 ctan/
