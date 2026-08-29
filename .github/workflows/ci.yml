@@ -115,10 +115,20 @@ jobs:
         working-directory: example
         run: |
           set -e
-          cp ../inspirehep.sty .
+          # Both files beside the document, which is what step 1 of the
+          # README tells a user to do -- and what the self-fetch needs,
+          # since script= is resolved from the compile directory.
+          cp ../inspirehep.sty ../inspirehep-fetch.py .
           if [ "${{ matrix.fetch }}" = latex ]; then
+            # The data file is committed, so without removing it this leg would
+            # typeset the committed numbers and pass whether or not the package
+            # can actually fetch its own -- which is the one thing it is here to
+            # prove.  Deleting it makes the first pass do the work.
+            rm -f inspirehep-data.tex
             pdflatex -shell-escape -interaction=nonstopmode example.tex
             pdflatex -shell-escape -interaction=nonstopmode example.tex
+            test -f inspirehep-data.tex \
+              || { echo 'the self-fetch wrote nothing'; exit 1; }
           else
             python3 ../inspirehep-fetch.py example.tex
             pdflatex -interaction=nonstopmode example.tex

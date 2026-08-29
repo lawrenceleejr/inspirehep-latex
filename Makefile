@@ -16,7 +16,7 @@ $(PKG).pdf: $(PKG)-doc.tex $(PKG).sty
 	mv $(PKG)-doc.pdf $(PKG).pdf
 
 example:
-	cd example && cp ../$(PKG).sty . && \
+	cd example && cp ../$(PKG).sty ../$(PKG)-fetch.py . && \
 	  python3 ../$(PKG)-fetch.py example.tex && \
 	  pdflatex -interaction=nonstopmode example.tex
 
@@ -56,4 +56,4 @@ example/inspirehep-data.tex:
 clean:
 	rm -f *.aux *.log *.out *.toc *.vrb $(PKG)-doc.pdf
 	rm -rf ctan
-	cd example && rm -f *.aux *.log *.out *.pdf $(PKG).sty *.json
+	cd example && rm -f *.aux *.log *.out *.pdf $(PKG).sty $(PKG)-fetch.py *.json

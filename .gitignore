@@ -18,6 +18,7 @@ ctan/
 
 # copied in by `make example`
 example/inspirehep.sty
+example/inspirehep-fetch.py
 
 # tooling
 .ruff_cache/

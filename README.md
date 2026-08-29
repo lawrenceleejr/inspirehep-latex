@@ -9,8 +9,8 @@ and plots in LaTeX — for a CV, a proposal, or a paper.
 
 ```sh
 BASE=https://raw.githubusercontent.com/lawrenceleejr/inspirehep-latex/main
-curl -O $BASE/inspirehep.sty          # the package
-curl -O $BASE/inspirehep-fetch.py     # fetches the numbers (standard library only)
+curl -O $BASE/inspirehep.sty          # the package itself
+curl -O $BASE/inspirehep-fetch.py     # what it runs to fetch (standard library only)
 ```
 
 **2. Load the package.**
@@ -27,21 +27,38 @@ from the record's URL (`inspirehep.net/literature/`**`1701002`**) or its texkey
 \inspirepub{1701002}
 ```
 
-**4. Fetch once, then compile as usual.**
+**4. Compile twice, with `-shell-escape`.**
+
+```sh
+pdflatex -shell-escape mydoc.tex
+pdflatex -shell-escape mydoc.tex
+```
+
+> **Collider Searches for Long-Lived Particles Beyond the Standard Model** [245 citations]
+
+The first pass notices what the document asks for and fetches it; the second
+typesets it — the same two-pass shape as a table of contents, cross-references,
+or a bibliography. `-shell-escape` is what lets the package run the fetcher for
+you; without it LaTeX may not start another program.
+
+After that the figures live in a generated file beside your document, so **it
+compiles anywhere** — offline, on a colleague's machine, with no `-shell-escape`
+at all. Nothing needs refetching until you want the numbers brought up to date.
+
+### If you cannot use `-shell-escape`
+
+Overleaf disables it, and so do some locked-down TeX installations. Run the
+fetcher yourself, then compile normally — it writes the same file, so the
+document cannot tell the difference:
 
 ```sh
 python3 inspirehep-fetch.py mydoc.tex
 pdflatex mydoc.tex
 ```
 
-> **Collider Searches for Long-Lived Particles Beyond the Standard Model** [245 citations]
+On Overleaf, where you cannot run it at all, see [Overleaf](#overleaf) below.
 
-That is the whole loop. The figures land in a generated file next to your
-document, so from then on **it compiles anywhere** — offline, on a colleague's
-machine, on Overleaf — whether or not it can reach the network. Re-run step 4
-whenever you want the numbers brought up to date.
-
-Below: the four things people come here for.
+## What you can ask for
 
 ### A paper
 

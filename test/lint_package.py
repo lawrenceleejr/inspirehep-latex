@@ -128,6 +128,17 @@ def main() -> int:
         fail("inspirehep-fetch.py emits a colon-separated series; a colon is a "
              "letter under \\ExplSyntaxOn and will not match in a data file")
 
+    # A ~ is an ordinary space token under \ExplSyntaxOn, and TeX discards
+    # spaces after a control word -- so a ~ written straight after a variable
+    # vanishes.  In the shell command that self-fetches, that silently joined
+    # the script name to the filename and the fetch failed with the document
+    # still compiling, which is exactly the kind of thing nothing else catches.
+    for block in re.findall(r"\\sys_shell_now:\w+\s*\{(.*?)\n\s*\}", sty_code, re.S):
+        for swallowed in re.findall(r"(\\[A-Za-z_:]{2,})~", block):
+            fail(f"`{swallowed}~' in a shell command: the ~ is swallowed as that "
+                 f"control word's terminator, so no space is emitted -- use "
+                 f"\\c_space_tl")
+
     # pgfplots is optional and must stay behind the `plots' option, because
     # loading it costs every document that does not draw anything.
     for match in re.finditer(r"\\RequirePackage\s*\{\s*pgfplots\s*\}", sty):
@@ -138,8 +149,8 @@ def main() -> int:
 
     # Every \ExplSyntaxOn needs its Off, or everything after the package sees
     # spaces stripped and colons turned into letters.
-    code = strip_comments(sty)
-    opened, closed = code.count(r"\ExplSyntaxOn"), code.count(r"\ExplSyntaxOff")
+    opened = sty_code.count(r"\ExplSyntaxOn")
+    closed = sty_code.count(r"\ExplSyntaxOff")
     if opened != closed:
         fail(f"unbalanced expl3 syntax: {opened} \\ExplSyntaxOn against "
              f"{closed} \\ExplSyntaxOff")

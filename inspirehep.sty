@@ -592,9 +592,17 @@
         \PackageInfo { inspirehep } { refreshing~from~inspirehep.net }
         \sys_shell_now:x
           {
-            python3~\g_inspirehep_script_tl~\c_sys_jobname_str .tex~%
-            --output~\g_inspirehep_data_tl .tex~%
-            --bib~\g_inspirehep_bib_tl .bib~%
+            % The separators below are \c_space_tl, not ~, after a variable.
+            % Under \ExplSyntaxOn a ~ is an ordinary space token, and TeX
+            % discards spaces following a control word -- so a ~ written
+            % straight after \g_inspirehep_script_tl is swallowed as that
+            % csname's terminator, and the script name runs into the file
+            % name.  A ~ after a plain character (python3, --output) is
+            % fine, which is why only some of these need it.
+            python3~\g_inspirehep_script_tl \c_space_tl
+            \c_sys_jobname_str .tex \c_space_tl
+            --output~\g_inspirehep_data_tl .tex \c_space_tl
+            --bib~\g_inspirehep_bib_tl .bib \c_space_tl
             --style~\g_inspirehep_style_tl
           }
         \PackageWarningNoLine { inspirehep }
