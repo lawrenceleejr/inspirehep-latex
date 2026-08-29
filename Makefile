@@ -7,13 +7,12 @@ VERSION = 0.2
 # What CI runs, and what to run before pushing.
 check: lint unit test doc
 
-doc: $(PKG).pdf
+doc: $(PKG)-doc.pdf
 
-$(PKG).pdf: $(PKG)-doc.tex $(PKG).sty
+$(PKG)-doc.pdf: $(PKG)-doc.tex $(PKG).sty
 	-python3 $(PKG)-fetch.py $(PKG)-doc.tex --output $(PKG)-doc-data.tex
 	pdflatex -interaction=nonstopmode $(PKG)-doc.tex
 	pdflatex -interaction=nonstopmode $(PKG)-doc.tex
-	mv $(PKG)-doc.pdf $(PKG).pdf
 
 example:
 	cd example && cp ../$(PKG).sty ../$(PKG)-fetch.py . && \
@@ -42,7 +41,7 @@ lint:
 ctan: doc example/inspirehep-data.tex
 	rm -rf ctan/$(PKG) $(PKG).zip
 	mkdir -p ctan/$(PKG)/example
-	cp $(PKG).sty $(PKG)-doc.tex $(PKG)-doc-data.tex $(PKG).pdf $(PKG)-fetch.py \
+	cp $(PKG).sty $(PKG)-doc.tex $(PKG)-doc-data.tex $(PKG)-doc.pdf $(PKG)-fetch.py \
 	   README.md LICENSE ctan/$(PKG)/
 	cp example/example.tex example/inspirehep-data.tex ctan/$(PKG)/example/
 	cd ctan && zip -qr ../$(PKG).zip $(PKG)

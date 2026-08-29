@@ -11,7 +11,7 @@ inspirehep-data*.json
 # build products
 __pycache__/
 *.py[codz]
-inspirehep.pdf
+inspirehep-doc.pdf
 inspirehep.zip
 ctan/
 *.vrb

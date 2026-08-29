@@ -368,7 +368,7 @@ make check     # everything CI runs: lint, unit, test, doc
 make lint      # ruff, plus the checks a compiler cannot make
 make unit      # the helper's pure parts -- no network, runs in a second
 make test      # build the example and look for the numbers in the PDF
-make doc       # the manual, as inspirehep.pdf
+make doc       # the manual, as inspirehep-doc.pdf
 make ctan      # the archive to upload to CTAN
 ```
 

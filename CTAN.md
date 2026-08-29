@@ -15,10 +15,17 @@ Upload it at <https://ctan.org/upload> with:
 | Suggested CTAN path | `/macros/latex/contrib/inspirehep` |
 | Topics | `bibtex-supp`, `cv`, `physics` |
 
+The package is **`inspirehep`** on CTAN, not `inspirehep-latex`: CTAN avoids
+names ending in `latex`, and `inspirehep` matches the files in the archive.
+`inspirehep-latex` remains the repository name only.
+
+The manual ships as `inspirehep-doc.pdf`, at CTAN's request — the name it is
+built under, rather than shortened to the package name.
+
 Before uploading:
 
 - [ ] `make test` passes (the example builds and the numbers reach the PDF)
-- [ ] `make doc` produces `inspirehep.pdf` with no errors
+- [ ] `make doc` produces `inspirehep-doc.pdf` with no errors
 - [ ] the version and date in `\ProvidesPackage` are current, and match this file
 - [ ] `README.md` describes the version being uploaded
 - [ ] the package loads on a clean TeX Live with only `xparse` and `l3keys2e`,

@@ -188,14 +188,14 @@ jobs:
             grep -nE '^(!|l\.[0-9])' inspirehep-doc.log | head -30
             exit 1
           fi
-          pages=$(pdfinfo inspirehep.pdf | awk '/^Pages:/ { print $2 }')
+          pages=$(pdfinfo inspirehep-doc.pdf | awk '/^Pages:/ { print $2 }')
           echo "pages: $pages"
           [ "$pages" -ge 8 ] || { echo 'the manual has lost most of itself'; exit 1; }
           # Two [? ...] markers belong in the manual: the missing-data demo,
           # which asks for id 999999999 on purpose, and the literal default of
           # \inspiremissing shown in a code listing.  Any other marker means a
           # lookup the manual meant to succeed did not.
-          stray=$(pdftotext inspirehep.pdf - \
+          stray=$(pdftotext inspirehep-doc.pdf - \
                   | grep -o '\[?[^]]*\]' | sort -u \
                   | grep -v '999999999' | grep -v '#1' || true)
           if [ -n "$stray" ]; then
@@ -211,10 +211,10 @@ jobs:
           {
             echo '## Manual'
             echo
-            if [ -f inspirehep.pdf ]; then
+            if [ -f inspirehep-doc.pdf ]; then
               echo '| Pages | Size |'
               echo '| ----: | ---: |'
-              echo "| $(pdfinfo inspirehep.pdf | awk '/^Pages:/ { print $2 }') | $(du -h inspirehep.pdf | cut -f1) |"
+              echo "| $(pdfinfo inspirehep-doc.pdf | awk '/^Pages:/ { print $2 }') | $(du -h inspirehep-doc.pdf | cut -f1) |"
             else
               echo 'The manual did not build.'
             fi
@@ -223,7 +223,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: manual
-          path: inspirehep.pdf
+          path: inspirehep-doc.pdf
           if-no-files-found: error
           retention-days: 90
 
@@ -255,7 +255,7 @@ jobs:
           top=$(unzip -Z1 inspirehep.zip | cut -d/ -f1 | sort -u)
           [ "$top" = inspirehep ] \
             || { echo "top level is '$top', expected a single 'inspirehep'"; exit 1; }
-          for required in inspirehep.sty inspirehep.pdf README.md LICENSE; do
+          for required in inspirehep.sty inspirehep-doc.pdf README.md LICENSE; do
             unzip -Z1 inspirehep.zip | grep -qx "inspirehep/$required" \
               || { echo "missing from the archive: $required"; exit 1; }
           done
