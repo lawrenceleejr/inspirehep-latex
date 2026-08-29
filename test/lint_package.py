@@ -119,6 +119,12 @@ def main() -> int:
         elif makefile_version.group(1) != version:
             fail(f"version mismatch: inspirehep.sty says v{version}, the "
                  f"Makefile says {makefile_version.group(1)}")
+        doc_version = re.search(r"\\date\{Version\s+([\d.]+)", doc)
+        if not doc_version:
+            fail(f"{DOC.name} has no \\date{{Version ...}} line")
+        elif doc_version.group(1) != version:
+            fail(f"version mismatch: inspirehep.sty says v{version}, "
+                 f"{DOC.name} says {doc_version.group(1)}")
 
     # --- traps this package has actually fallen into --------------------
     # A `:' is a letter under \ExplSyntaxOn, so a data file must never rely on

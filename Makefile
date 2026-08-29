@@ -1,6 +1,6 @@
 # Build the manual, and the archive CTAN wants.
 PKG     = inspirehep
-VERSION = 2.0
+VERSION = 0.1
 
 .PHONY: all doc example test unit lint check clean ctan
 
