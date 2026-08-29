@@ -35,6 +35,24 @@ Drop `inspirehep.sty` next to your `.tex` file, or anywhere in your `TEXINPUTS`.
 That is the whole package; everything else in this repository is documentation,
 an example, and the optional helper described below.
 
+To track the package from a document's own repository, carry it as a submodule
+and point `TEXINPUTS` at it from your build script:
+
+```sh
+git submodule add https://github.com/lawrenceleejr/inspirehep-latex
+export TEXINPUTS=".:inspirehep-latex:${TEXINPUTS:-}"
+```
+
+That value ends in an empty entry, which is what keeps TeX searching its own
+trees as well; without it the package would be the only thing it could find.
+
+Keep `\usepackage{inspirehep}` unqualified rather than writing the submodule
+path into it. The bare name resolves through `TEXINPUTS` locally and also finds
+the file when it sits beside the sources, which is what Overleaf needs — its Git
+sync does not fetch submodules, so there you upload `inspirehep.sty` to the
+project root. A path-qualified `\usepackage` finds neither, and warns that the
+name it was given is not the name the package provides.
+
 ## Getting the numbers
 
 The figures come from `inspirehep-data.tex`. There are two ways to produce it,
