@@ -125,15 +125,9 @@ jobs:
           fi
 
       - name: The numbers must actually be there
-        working-directory: example
         run: |
-          echo '--- generated data ---'; cat inspirehep-data.tex
-          pdftotext example.pdf - > out.txt
-          grep -qE '\[[0-9]+ citations?\]' out.txt \
-            || { echo 'no citation annotation in the output'; cat out.txt; exit 1; }
-          grep -q 'h-index of [0-9]' out.txt \
-            || { echo 'no author-level figure in the output'; cat out.txt; exit 1; }
-          echo 'OK'
+          echo '--- generated data ---'; cat example/inspirehep-data.tex
+          sh test/check_example.sh example/example.pdf
 
       # The package's central promise is that a document always compiles: on a
       # machine with no network, on Overleaf, on a checkout that has never
@@ -142,15 +136,11 @@ jobs:
       # rather than a stopped compile or a silently wrong number.
       - name: Compiles with no data at all
         if: matrix.fetch == 'python'
-        working-directory: example
         run: |
           set -e
-          rm -f inspirehep-data.tex
-          pdflatex -interaction=nonstopmode example.tex
-          pdftotext example.pdf - > none.txt
-          grep -q '\[?' none.txt \
-            || { echo 'expected [? ...] markers with no data'; cat none.txt; exit 1; }
-          echo 'OK: still a PDF, and it says what it does not know'
+          rm -f example/inspirehep-data.tex
+          cd example && pdflatex -interaction=nonstopmode example.tex && cd ..
+          sh test/check_example.sh example/example.pdf --no-data
 
       - uses: actions/upload-artifact@v4
         with:

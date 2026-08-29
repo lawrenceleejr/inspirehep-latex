@@ -20,9 +20,9 @@ example:
 	  python3 ../$(PKG)-fetch.py example.tex && \
 	  pdflatex -interaction=nonstopmode example.tex
 
+# The same assertions CI makes, from the same script, so the two cannot drift.
 test: example
-	cd example && pdftotext example.pdf - | grep -qE '\[[0-9]+ citations?\]'
-	@echo "OK"
+	sh test/check_example.sh example/example.pdf
 
 # The pure parts of the helper: patterns, path walking, escaping, file shape.
 # No network, so this is the check to run while editing.
