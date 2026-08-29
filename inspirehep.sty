@@ -128,6 +128,37 @@
       { \textbf { [?~#1] } }
   }
 
+%% \inspirestatround{<key>}{<step>} -- the same figure rounded DOWN to a
+%% multiple of <step>, which is what "over 200,000 citations" wants: a round
+%% number that stays true as the real one grows.  Rounding up would make the
+%% claim false the moment it was typeset.
+%%
+%%   \inspirestatround{citations}{1000}   ->   207,000
+%%
+%% Digits are grouped by \inspirenumformat, redefinable for another convention
+%% (a thin space, a full stop, or nothing at all).
+\cs_new:Npn \inspirehep_group:n #1
+  {
+    \int_compare:nNnTF { \tl_count:n {#1} } > { 3 }
+      {
+        \exp_args:Nf \inspirehep_group:n
+          { \tl_range:nnn {#1} { 1 } { \int_eval:n { \tl_count:n {#1} - 3 } } }
+        \inspirenumsep
+        \tl_range:nnn {#1} { \int_eval:n { \tl_count:n {#1} - 2 } } { \tl_count:n {#1} }
+      }
+      {#1}
+  }
+\providecommand \inspirenumsep { , }
+\providecommand \inspirenumformat [1] { \inspirehep_group_wrap:n {#1} }
+\cs_new:Npn \inspirehep_group_wrap:n #1 { \exp_args:Nf \inspirehep_group:n { \int_to_arabic:n {#1} } }
+
+\NewDocumentCommand \inspirestatround { m m }
+  {
+    \prop_get:NnNTF \g_inspirehep_stat_prop {#1} \l_tmpa_tl
+      { \inspirenumformat { \int_eval:n { \int_div_truncate:nn { \l_tmpa_tl } {#2} * #2 } } }
+      { \textbf { [?~#1] } }
+  }
+
 \ExplSyntaxOff
 
 \ExplSyntaxOn

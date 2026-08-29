@@ -13,9 +13,15 @@ Live [INSPIRE-HEP](https://inspirehep.net) citation counts in a LaTeX CV.
 and, for the summary line people put at the top of a publication list:
 
 ```latex
-Over \inspirestat{papers} papers with \inspirestat{citations} citations
-and an $h$-index of \inspirestat{hindex}.
+Over \inspirestatround{papers}{100} papers with over
+\inspirestatround{citations}{1000} citations and an
+$h$-index of \inspirestat{hindex}.
 ```
+
+> Over 1,400 papers with over 207,000 citations and an *h*-index of 211.
+
+`\inspirestatround` rounds **down**, so a claim of "over N" stays true as the
+real figure grows.
 
 The numbers live in a generated file, so **the document always compiles** —
 offline, on a stranger's machine, on Overleaf — whether or not it can reach the
@@ -80,6 +86,7 @@ already degrades to exactly the same behaviour.
 | `\inspirepub{<record>}{<title>}` | the title, linked to its INSPIRE record, followed by the citation count |
 | `\inspirecites{<record>}` | just the count, for a title you want to set yourself |
 | `\inspirestat{papers\|citations\|hindex}` | an author-level figure |
+| `\inspirestatround{<key>}{<step>}` | the same, rounded **down** to a multiple of `<step>` and digit-grouped: `\inspirestatround{citations}{1000}` gives `207,000` |
 | `\inspiredefaultstat{<key>}{<value>}` | a fallback used only until the figures have been fetched once |
 
 The record number is the one in the INSPIRE URL:
@@ -106,6 +113,7 @@ Three hooks, each redefinable:
 \renewcommand{\inspiretitleformat}[1]{\textbf{#1}}          % the title
 \renewcommand{\inspirecitestext}[1]{#1~cites}               % the words
 \renewcommand{\inspirecitesformat}[1]{\nobreakspace{\small[#1]}}  % the wrapper
+\renewcommand{\inspirenumsep}{\,}                           % digit grouping
 ```
 
 To set the annotation in a muted grey, for instance:
