@@ -485,7 +485,11 @@
         x tick label style={/pgf/number format/1000 sep={}},
         ylabel={#2}, ylabel style={font=\small},
         tick label style={font=\small},
-        ymin=0, enlarge x limits=0.03, clip=false,
+        % A little headroom above the peak: without it the highest point sits
+        % exactly on the top edge, where a thick line reads as clipped.  Only
+        % the upper bound moves, so the axis still starts at zero.
+        ymin=0, enlarge y limits={upper, value=0.08},
+        enlarge x limits=0.03, clip=false,
         \inspireplotstyle
       ]
       \addplot[thick, mark=none, black] coordinates {#1};

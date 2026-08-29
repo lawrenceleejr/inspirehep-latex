@@ -53,6 +53,114 @@ sync does not fetch submodules, so there you upload `inspirehep.sty` to the
 project root. A path-qualified `\usepackage` finds neither, and warns that the
 name it was given is not the name the package provides.
 
+## Quick start
+
+```latex
+\usepackage{inspirehep}
+```
+
+Then refresh the figures once. After that the document compiles anywhere,
+offline included:
+
+```sh
+python3 inspirehep-fetch.py mydoc.tex
+```
+
+Every command takes an INSPIRE id — either the record number from the URL
+(`inspirehep.net/literature/`**`1701002`**) or the texkey (`Lee:2018pag`). The
+package tells the two apart by shape, so you never have to say which you meant.
+
+### A paper
+
+```latex
+\inspirepub{1701002}
+```
+
+> **Collider Searches for Long-Lived Particles Beyond the Standard Model** [245 citations]
+
+The title comes from INSPIRE. Options choose what else appears — `year` adds
+the publication year, `title=` supplies your own wording instead:
+
+```latex
+\inspirepub[year]{2642414}
+\inspirepub[title={A title in my own words}]{2642414}
+```
+
+> **Towards a muon collider** [407 citations] (2023)
+>
+> **A title in my own words** [407 citations]
+
+For a full reference, as INSPIRE itself formats it:
+
+```latex
+\inspireref[cites=false]{1701002}
+```
+
+> L. Lee, C. Ohm, A. Soffer and T. T. Yu, "Collider Searches for Long-Lived
+> Particles Beyond the Standard Model," Prog. Part. Nucl. Phys. **106** (2019),
+> 210-255 doi:10.1016/j.ppnp.2019.02.006 [arXiv:1810.12602 [hep-ph]].
+
+Each piece is also a command of its own: `\inspiretitle`, `\inspirecites`,
+`\inspireyear`, `\inspirekey`.
+
+### A person
+
+Author commands take the id of the person they ask about, so one document can
+discuss several:
+
+```latex
+Over \inspirepapers[round=100]{1071846} papers, over
+\inspirecitations[round=1000]{1071846} citations, $h$-index
+\inspirehindex{1071846}.
+```
+
+> Over 1,400 papers, over 207,000 citations, *h*-index 211.
+
+`round=` rounds **down**, so a claim of "over N" stays true as the real figure
+grows.
+
+### Citing a paper
+
+`\inspirecite` is `\cite` by INSPIRE id. The fetcher collects INSPIRE's own
+BibTeX entry for everything you cite into `inspirehep-refs.bib`, so you never
+handle a citation key:
+
+```latex
+as shown in \inspirecite{1701002}
+...
+\bibliographystyle{unsrt}
+\bibliography{inspirehep-refs}
+```
+
+> as shown in [1]
+>
+> **[1]** Lawrence Lee, Christian Ohm, Abner Soffer, and Tien-Tien Yu. Collider
+> Searches for Long-Lived Particles Beyond the Standard Model. *Prog. Part.
+> Nucl. Phys.*, 106:210–255, 2019.
+
+Run `bibtex` between the two `pdflatex` passes, as you would for any
+bibliography. The `.bib` file is written by the fetch, so it needs no editing —
+and `\inspirekey{<id>}` hands you the key if something else wants it.
+
+### A plot
+
+Load with the `plots` option — it pulls in `pgfplots`, which a document that
+never plots should not pay for:
+
+```latex
+\usepackage[plots]{inspirehep}
+...
+\inspireauthorplot{1071846}{citations}
+```
+
+![Citations per year for one person](doc/plot-example.png)
+
+`{papers}` instead of `{citations}` plots output rather than impact, and
+`\inspireplot{<id>}` is one paper's citation history. The style is deliberately
+spare — one line, axis lines only where they carry information, no grid, box,
+marks, or legend — and `\inspireplotstyle` takes any `pgfplots` axis keys if
+you want otherwise.
+
 ## Getting the numbers
 
 The figures come from `inspirehep-data.tex`. There are two ways to produce it,
