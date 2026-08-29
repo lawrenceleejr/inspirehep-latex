@@ -140,6 +140,7 @@
 \prop_new:N \g_inspirehep_cites_prop
 \prop_new:N \g_inspirehep_title_prop
 \prop_new:N \g_inspirehep_key_prop
+\prop_new:N \g_inspirehep_recid_prop
 \prop_new:N \g_inspirehep_ref_prop          % a whole reference, set by hand
 \prop_new:N \g_inspirehep_refauthors_prop
 \prop_new:N \g_inspirehep_refpub_prop
@@ -164,6 +165,7 @@
 \NewDocumentCommand \inspiresetcites      { m m }   { \prop_gput:Nnn \g_inspirehep_cites_prop {#1} {#2} }
 \NewDocumentCommand \inspiresettitle      { m m }   { \prop_gput:Nnn \g_inspirehep_title_prop {#1} {#2} }
 \NewDocumentCommand \inspiresetkey        { m m }   { \prop_gput:Nnn \g_inspirehep_key_prop   {#1} {#2} }
+\NewDocumentCommand \inspiresetrecid      { m m }   { \prop_gput:Nnn \g_inspirehep_recid_prop {#1} {#2} }
 \NewDocumentCommand \inspiresetref         { m m }   { \prop_gput:Nnn \g_inspirehep_ref_prop         {#1} {#2} }
 \NewDocumentCommand \inspiresetrefauthors  { m m }   { \prop_gput:Nnn \g_inspirehep_refauthors_prop  {#1} {#2} }
 \NewDocumentCommand \inspiresetrefpub      { m m }   { \prop_gput:Nnn \g_inspirehep_refpub_prop      {#1} {#2} }
@@ -227,7 +229,25 @@
 \cs_new:Npn \inspirehep_link:nn #1#2 { #2 }
 \AddToHook { begindocument }
   { \cs_if_exist:NT \href { \cs_gset:Npn \inspirehep_link:nn #1#2 { \href {#1} {#2} } } }
-\cs_new:Npn \inspirehep_url:n #1 { https://inspirehep.net/literature/#1 }
+%% A record can be named either by its recid (2642414) or by its INSPIRE
+%% texkey (Lee:2018pag); the two are told apart by shape, so nothing has to be
+%% declared.  Lookups just use whichever string the document wrote, because the
+%% fetcher stores the data under that same string.  Only the URL needs the
+%% number, which the fetcher supplies alongside when a texkey was used.
+\prg_new_conditional:Npnn \inspirehep_is_texkey:n #1 { TF }
+  {
+    \regex_match:nnTF { \A [A-Za-z] [\w.'\-]* : \d{4} [A-Za-z0-9]+ \Z } {#1}
+      { \prg_return_true: } { \prg_return_false: }
+  }
+
+%% The URL is built into a variable rather than expanded in place: \href reads
+%% its argument under special catcodes and will not tolerate a conditional
+%% there, so anything non-expandable has to happen first.
+\cs_new_protected:Npn \inspirehep_url:nN #1#2
+  {
+    \prop_get:NnNF \g_inspirehep_recid_prop {#1} #2 { \tl_set:Nn #2 {#1} }
+    \tl_put_left:Nn #2 { https://inspirehep.net/literature/ }
+  }
 
 \cs_new_protected:Npn \inspirehep_lookup:NnnTF #1#2#3
   {
@@ -323,10 +343,30 @@
 \NewDocumentCommand \inspirekey { m }
   {
     \inspirehep_want:Nn \g_inspirehep_bibs_seq {#1}
-    \inspirehep_lookup:NnnTF \g_inspirehep_key_prop {#1} \l_tmpa_tl
-      { \tl_use:N \l_tmpa_tl } { \inspiremissing { key~#1 } }
+    \prop_get:NnNTF \g_inspirehep_key_prop {#1} \l_tmpa_tl
+      { \tl_use:N \l_tmpa_tl }
+      {
+        % Given a texkey, that is already the answer -- so \inspirecite works
+        % before anything has ever been fetched.  Given a recid we cannot know
+        % it yet, so say so and ask the next fetch for it.
+        \bool_gset_true:N \g_inspirehep_missing_bool
+        \inspirehep_is_texkey:nTF {#1} {#1} { \inspiremissing { key~#1 } }
+      }
   }
-\NewDocumentCommand \inspirecite { m } { \cite { \inspirekey {#1} } }
+%% \cite turns its argument into a control sequence, so it cannot be handed an
+%% unexpanded \inspirekey -- the key is looked up first and passed by value.
+\NewDocumentCommand \inspirecite { m }
+  {
+    \inspirehep_want:Nn \g_inspirehep_bibs_seq {#1}
+    \prop_get:NnNTF \g_inspirehep_key_prop {#1} \l_tmpa_tl
+      { \exp_args:NV \cite \l_tmpa_tl }
+      {
+        \bool_gset_true:N \g_inspirehep_missing_bool
+        \inspirehep_is_texkey:nTF {#1}
+          { \cite {#1} }                       % a texkey is already the key
+          { \inspiremissing { key~#1 } }
+      }
+  }
 
 %% \inspirepub[<options>]{<id>} -- a publication entry.
 %%
@@ -359,10 +399,15 @@
     \group_end:
   }
 
+\tl_new:N \l_inspirehep_url_tl
 \cs_new_protected:Npn \inspirehep_show:nn #1#2
   {
     \bool_if:NTF \l_inspirehep_link_bool
-      { \inspirehep_link:nn { \inspirehep_url:n {#1} } {#2} } {#2}
+      {
+        \inspirehep_url:nN {#1} \l_inspirehep_url_tl
+        \exp_args:NV \inspirehep_link:nn \l_inspirehep_url_tl {#2}
+      }
+      {#2}
   }
 
 %% \inspireyear{<id>} -- the publication year, taken from the reference.

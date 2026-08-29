@@ -84,8 +84,15 @@ already degrades to exactly the same behaviour.
 
 ## Commands
 
-**Records.** The id is the number in the INSPIRE URL,
-`inspirehep.net/literature/`**`2642414`**.
+**Records.** Name a record either by its recid — the number in the INSPIRE
+URL, `inspirehep.net/literature/`**`2642414`** — or by its INSPIRE texkey,
+`Accettura:2023ked`. Every command takes either; they are told apart by shape,
+so nothing has to be declared, and both link to the record by number.
+
+```latex
+\inspirepub{2642414}          % by recid
+\inspirepub{Accettura:2023ked} % the same paper, by texkey
+```
 
 | Command | Result |
 | --- | --- |
