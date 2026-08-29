@@ -306,3 +306,37 @@ class Render(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BibTargets(unittest.TestCase):
+    """One BibTeX entry per record, however the document names it.
+
+    A repeated key makes BibTeX skip the entry outright, which silently costs
+    every citation of that paper its reference.
+    """
+
+    def test_two_names_for_one_record_yield_one_entry(self):
+        records = {"1701002": a_record(recid="1701002"),
+                   "Lee:2018pag": a_record(recid="1701002")}
+        targets = fetch.bib_targets(["1701002", "Lee:2018pag"], records)
+        self.assertEqual(list(targets), ["1701002"])
+
+    def test_the_first_name_used_is_the_one_reported(self):
+        records = {"Lee:2018pag": a_record(recid="1701002"),
+                   "1701002": a_record(recid="1701002")}
+        targets = fetch.bib_targets(["Lee:2018pag", "1701002"], records)
+        self.assertEqual(targets, {"1701002": "Lee:2018pag"})
+
+    def test_distinct_records_are_kept_apart(self):
+        records = {"1701002": a_record(recid="1701002"),
+                   "2642414": a_record(recid="2642414")}
+        targets = fetch.bib_targets(["1701002", "2642414"], records)
+        self.assertEqual(sorted(targets), ["1701002", "2642414"])
+
+    def test_an_unknown_identifier_stands_for_itself(self):
+        # Nothing was fetched for it, so there is no record number to map to.
+        self.assertEqual(fetch.bib_targets(["Nobody:2099zzz"], {}),
+                         {"Nobody:2099zzz": "Nobody:2099zzz"})
+
+    def test_nothing_wanted_is_nothing_fetched(self):
+        self.assertEqual(fetch.bib_targets([], {}), {})

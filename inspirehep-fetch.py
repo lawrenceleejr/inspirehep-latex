@@ -345,6 +345,27 @@ def discover(sources: list[Path]) -> dict[str, list[str]]:
     }
 
 
+def bib_targets(wanted: list[str], records: dict) -> dict[str, str]:
+    """Which records need a BibTeX entry, one per record.
+
+    One paper can be cited two ways -- \\inspirecite{1701002} and
+    \\inspirecite{Lee:2018pag} are the same entry -- and INSPIRE returns
+    identical BibTeX for both.  Writing it twice puts a repeated key in the
+    .bib, which BibTeX refuses outright ("Repeated entry ... I'm skipping
+    whatever remains of this entry"), losing the entry and every citation of
+    it.  So this is keyed by record number, mapped to whichever identifier the
+    document used first, which is the one messages should name.
+
+    Repeating a single identifier was never the problem: those collapse when
+    the sources are scanned.  This is the case where the two differ.
+    """
+    targets: dict[str, str] = {}
+    for identifier in wanted:
+        numeric = records.get(identifier, {}).get("recid", identifier)
+        targets.setdefault(numeric, identifier)
+    return targets
+
+
 def render(records: dict, plots: dict, authors: dict, author_years: dict,
            primary: str | None) -> str:
     """The generated file the package reads: one declaration per fact."""
@@ -472,10 +493,9 @@ def main(argv: list[str] | None = None) -> int:
         for kind, query in (("papers", f"a {bai}"), ("citations", f"refersto a {bai}")):
             if (years := attempt(f"author {aid} {kind}", fetch_years, query)) is not None:
                 author_years[aid][kind] = years
-    for recid in wanted["bibtex"]:
-        numeric = records.get(recid, {}).get("recid", recid)
-        if (bib := attempt(f"bibtex {recid}", fetch_bibtex, numeric)) is not None:
-            bibs[recid] = bib
+    for numeric, named in bib_targets(wanted["bibtex"], records).items():
+        if (bib := attempt(f"bibtex {named}", fetch_bibtex, numeric)) is not None:
+            bibs[numeric] = bib
 
     if problems and args.strict:
         print(f"{problems} lookup(s) failed and --strict is set.", file=sys.stderr)
