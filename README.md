@@ -1,85 +1,53 @@
 # inspirehep-latex
 
-Live [INSPIRE-HEP](https://inspirehep.net) citation counts in a LaTeX CV.
-
-```latex
-\usepackage{inspirehep}
-...
-\inspirepub{2642414}
-```
-
-> Towards a Muon Collider [407 citations], *Eur. Phys. J. C* 83, 864
-
-Hand it an id; it fetches the title. And for the summary line at the top of a
-publication list:
-
-```latex
-Over \inspirepapers[round=100]{1071846} papers with over
-\inspirecitations[round=1000]{1071846} citations and an
-$h$-index of \inspirehindex{1071846}.
-```
-
-> Over 1,400 papers with over 207,000 citations and an *h*-index of 211.
-
-`round=` rounds **down**, so a claim of "over N" stays true as the real figure
-grows. Author commands take the id they are asking about rather than a package
-option, so one document can discuss several people.
-
-The numbers live in a generated file, so **the document always compiles** —
-offline, on a stranger's machine, on Overleaf — whether or not it can reach the
-network. Refreshing that file is the only part that needs anything.
-
-## Install
-
-Drop `inspirehep.sty` next to your `.tex` file, or anywhere in your `TEXINPUTS`.
-That is the whole package; everything else in this repository is documentation,
-an example, and the optional helper described below.
-
-To track the package from a document's own repository, carry it as a submodule
-and point `TEXINPUTS` at it from your build script:
-
-```sh
-git submodule add https://github.com/lawrenceleejr/inspirehep-latex
-export TEXINPUTS=".:inspirehep-latex:${TEXINPUTS:-}"
-```
-
-That value ends in an empty entry, which is what keeps TeX searching its own
-trees as well; without it the package would be the only thing it could find.
-
-Keep `\usepackage{inspirehep}` unqualified rather than writing the submodule
-path into it. The bare name resolves through `TEXINPUTS` locally and also finds
-the file when it sits beside the sources, which is what Overleaf needs — its Git
-sync does not fetch submodules, so there you upload `inspirehep.sty` to the
-project root. A path-qualified `\usepackage` finds neither, and warns that the
-name it was given is not the name the package provides.
+Live [INSPIRE-HEP](https://inspirehep.net) citation counts, titles, references,
+and plots in LaTeX — for a CV, a proposal, or a paper.
 
 ## Quick start
 
+**1. Put two files beside your `.tex` file.**
+
+```sh
+BASE=https://raw.githubusercontent.com/lawrenceleejr/inspirehep-latex/main
+curl -O $BASE/inspirehep.sty          # the package
+curl -O $BASE/inspirehep-fetch.py     # fetches the numbers (standard library only)
+```
+
+**2. Load the package.**
+
 ```latex
 \usepackage{inspirehep}
 ```
 
-Then refresh the figures once. After that the document compiles anywhere,
-offline included:
-
-```sh
-python3 inspirehep-fetch.py mydoc.tex
-```
-
-Every command takes an INSPIRE id — either the record number from the URL
-(`inspirehep.net/literature/`**`1701002`**) or the texkey (`Lee:2018pag`). The
-package tells the two apart by shape, so you never have to say which you meant.
-
-### A paper
+**3. Ask for something.** Every command takes an INSPIRE id — either the number
+from the record's URL (`inspirehep.net/literature/`**`1701002`**) or its texkey
+(`Lee:2018pag`). The package tells the two apart by shape.
 
 ```latex
 \inspirepub{1701002}
 ```
 
+**4. Fetch once, then compile as usual.**
+
+```sh
+python3 inspirehep-fetch.py mydoc.tex
+pdflatex mydoc.tex
+```
+
 > **Collider Searches for Long-Lived Particles Beyond the Standard Model** [245 citations]
 
-The title comes from INSPIRE. Options choose what else appears — `year` adds
-the publication year, `title=` supplies your own wording instead:
+That is the whole loop. The figures land in a generated file next to your
+document, so from then on **it compiles anywhere** — offline, on a colleague's
+machine, on Overleaf — whether or not it can reach the network. Re-run step 4
+whenever you want the numbers brought up to date.
+
+Below: the four things people come here for.
+
+### A paper
+
+`\inspirepub` is the one from step 3 — the title comes from INSPIRE, and the
+citation count follows it. Options choose what else appears: `year` adds the
+publication year, and `title=` supplies your own wording instead of INSPIRE's:
 
 ```latex
 \inspirepub[year]{2642414}
@@ -160,6 +128,30 @@ never plots should not pay for:
 spare — one line, axis lines only where they carry information, no grid, box,
 marks, or legend — and `\inspireplotstyle` takes any `pgfplots` axis keys if
 you want otherwise.
+
+## Install, other ways
+
+Step 1 above is the whole package: `inspirehep.sty` is all LaTeX needs, and
+everything else in this repository is documentation, an example, and that
+helper. `inspirehep.sty` can equally live anywhere in your `TEXINPUTS`.
+
+To track the package from a document's own repository, carry it as a submodule
+and point `TEXINPUTS` at it from your build script:
+
+```sh
+git submodule add https://github.com/lawrenceleejr/inspirehep-latex
+export TEXINPUTS=".:inspirehep-latex:${TEXINPUTS:-}"
+```
+
+That value ends in an empty entry, which is what keeps TeX searching its own
+trees as well; without it the package would be the only thing it could find.
+
+Keep `\usepackage{inspirehep}` unqualified rather than writing the submodule
+path into it. The bare name resolves through `TEXINPUTS` locally and also finds
+the file when it sits beside the sources, which is what Overleaf needs — its Git
+sync does not fetch submodules, so there you upload `inspirehep.sty` to the
+project root. A path-qualified `\usepackage` finds neither, and warns that the
+name it was given is not the name the package provides.
 
 ## Getting the numbers
 
