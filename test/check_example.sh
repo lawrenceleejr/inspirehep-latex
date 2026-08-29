@@ -53,6 +53,24 @@ echo "$text" | grep -qE '[0-9][0-9,.]* papers' \
 echo "$text" | grep -qE '[0-9][0-9,.]* citations' \
     || fail 'no citation total'
 
+# Links must point at INSPIRE records and nowhere else.  hyperref decides
+# between a URL and a local file by looking for a protocol, and a `:' that
+# reached it at the wrong catcode once made every link a filename -- which
+# hyperref silently completed with its default .pdf extension, so each link
+# went to a page that does not exist.  pdftohtml reads the annotations back.
+if command -v pdftohtml >/dev/null 2>&1; then
+    links=$(pdftohtml -i -stdout -noframes "$pdf" 2>/dev/null \
+            | grep -oE 'href="[^"]*"' | sed 's/href="//; s/"$//' | sort -u)
+    echo "$links" | grep -q 'inspirehep\.net' \
+        || fail 'no INSPIRE links in the output'
+    stray=$(echo "$links" | grep -v '^https://inspirehep\.net/' || true)
+    [ -z "$stray" ] || { echo "FAIL: a link that is not an INSPIRE record:" >&2
+                         echo "$stray" >&2; exit 1; }
+    bad=$(echo "$links" | grep -E 'inspirehep\.net/literature/[^/]*[^0-9]$' || true)
+    [ -z "$bad" ] || { echo "FAIL: malformed INSPIRE record link:" >&2
+                       echo "$bad" >&2; exit 1; }
+fi
+
 # A full reference, as INSPIRE renders it.
 echo "$text" | grep -q 'Prog. Part. Nucl. Phys.' \
     || fail 'no formatted reference'

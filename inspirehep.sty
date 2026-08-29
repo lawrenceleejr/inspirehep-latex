@@ -10,7 +10,7 @@
 %% https://github.com/lawrenceleejr/inspirehep-latex
 %%
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{inspirehep}[2026/08/29 v0.1
+\ProvidesPackage{inspirehep}[2026/08/29 v0.2
   Live INSPIRE-HEP citation counts, references, and plots]
 
 \RequirePackage{xparse}
@@ -244,6 +244,14 @@
   {
     \prop_get:NnNF \g_inspirehep_recid_prop {#1} #2 { \tl_set:Nn #2 {#1} }
     \tl_put_left:Nn #2 { https://inspirehep.net/literature/ }
+    % Flatten to a string, so every character sits at catcode 12.  hyperref
+    % decides between a URL and a local file by looking for a protocol, and
+    % under \ExplSyntaxOn a `:' is a letter rather than an ordinary character
+    % -- so `https:' did not read as a protocol, \href took the target for a
+    % filename, and hyperref appended its default .pdf extension.  Every link
+    % the package drew pointed at inspirehep.net/literature/<id>.pdf, which is
+    % not a page.
+    \tl_set:Nx #2 { \tl_to_str:N #2 }
   }
 
 \cs_new_protected:Npn \inspirehep_lookup:NnnTF #1#2#3
