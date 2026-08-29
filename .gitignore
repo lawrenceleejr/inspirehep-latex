@@ -7,3 +7,9 @@
 *.synctex.gz
 inspirehep-data*.json
 *.tex.tmp
+
+# build products
+__pycache__/
+inspirehep.pdf
+inspirehep.zip
+ctan/
