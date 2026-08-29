@@ -37,7 +37,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
             texlive-latex-base texlive-latex-recommended texlive-latex-extra \
-            texlive-fonts-recommended poppler-utils
+            texlive-fonts-recommended texlive-pictures poppler-utils
 
       - name: Build
         working-directory: example
@@ -63,8 +63,14 @@ jobs:
             || { echo 'no author-level figure in the output'; cat out.txt; exit 1; }
           echo 'OK'
 
+      - name: Build the manual
+        if: matrix.fetch == 'python'
+        run: make doc
+
       - uses: actions/upload-artifact@v4
         with:
           name: example-${{ matrix.fetch }}
-          path: example/example.pdf
+          path: |
+            example/example.pdf
+            inspirehep.pdf
           if-no-files-found: error

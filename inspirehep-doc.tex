@@ -1,0 +1,150 @@
+%% Manual for inspirehep.sty.  Build with:  make doc
+\documentclass[a4paper,11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage[hidelinks]{hyperref}
+\usepackage{booktabs}
+\usepackage{fancyvrb}
+\usepackage{inspirehep}
+
+% \BibTeX is not in the kernel; define it rather than depend on a package.
+\providecommand{\BibTeX}{B\textsc{ib}\TeX}
+\newcommand{\pkg}[1]{\textsf{#1}}
+\newcommand{\opt}[1]{\texttt{#1}}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\title{The \pkg{inspirehep} package\\[0.3em]
+  \large Live INSPIRE-HEP data in a \LaTeX{} document}
+\author{Lawrence Lee}
+\date{Version 2.0 \quad 2026/08/29}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+\pkg{inspirehep} puts data from \href{https://inspirehep.net}{INSPIRE-HEP} into
+a \LaTeX{} document: hand a command a record id and it typesets the title, the
+citation count, the full reference or the \BibTeX{} entry; hand it a person's id
+and it gives their publication count, citation count or $h$-index, or a plot of
+either against time. The numbers live in a generated file, so the document
+always compiles --- offline, on a stranger's machine, on Overleaf --- whether or
+not it can reach the network.
+\end{abstract}
+
+\section{Installation}
+Put \texttt{inspirehep.sty} where \LaTeX{} will find it: beside your document,
+or anywhere on \texttt{TEXINPUTS}. It requires only \pkg{xparse} and
+\pkg{l3keys2e}, both part of a current \LaTeX{}; \pkg{pgfplots} is needed only
+if you plot, and is loaded only if you ask for it with the \opt{plots} option.
+
+\section{Getting the data}
+The figures are read from \texttt{inspirehep-data.tex}. Two things can write
+it, and they write the same file.
+
+\textbf{The package itself.} With unrestricted shell escape it refreshes at the
+end of a run and asks for a rerun, exactly like a cross-reference:
+\begin{Verbatim}[frame=single,fontsize=\small]
+pdflatex -shell-escape cv.tex
+pdflatex -shell-escape cv.tex
+\end{Verbatim}
+After that it only refetches when there is a reason: a record you have just
+added, or data older than \opt{maxage}.
+
+\textbf{Or the helper.} \texttt{inspirehep-fetch.py} does the same job from
+outside the compile, needs only the Python standard library, and reads your
+sources to work out what to ask for:
+\begin{Verbatim}[frame=single,fontsize=\small]
+python3 inspirehep-fetch.py cv.tex
+\end{Verbatim}
+
+\subsection{Overleaf}
+Overleaf disables shell escape and its compile containers have no network, so
+nothing can fetch there --- but a document still typesets correct figures,
+because they are only an \verb|\input| file. Upload \texttt{inspirehep.sty},
+then add \texttt{inspirehep-data.tex} through \emph{Add file $\to$ From external
+URL}, pointing at the raw copy in your repository. Overleaf gives linked files
+a \emph{Refresh} button, so new figures are one click away. Note that Overleaf's
+Git sync does not fetch submodules: include the \texttt{.sty} as a file.
+
+\section{Records}
+\begin{Verbatim}[frame=single,fontsize=\small]
+\inspirepub{2642414}                  \inspirekey{2642414}
+\inspirepub[year]{2642414}            \inspirecite{2642414}
+\inspirepub[ref]{2642414}             \inspiretitle{2642414}
+\inspirepub[cites=false]{2642414}     \inspirecites{2642414}
+\inspirepub[title={My words}]{2642414}  \inspireref{2642414}
+\end{Verbatim}
+The id is the number in the INSPIRE URL,
+\texttt{inspirehep.net/literature/\textbf{2642414}}.
+
+References and \BibTeX{} come from INSPIRE's own renderers rather than being
+assembled from the metadata, so they match what everyone else in the field
+cites, errata included.
+
+\section{People}
+Every author command takes the id it is asking about, so one document can
+discuss several people. The id is the number in a profile URL,
+\texttt{inspirehep.net/authors/\textbf{1071846}}, or a BAI such as
+\texttt{J.Smith.1}.
+\begin{Verbatim}[frame=single,fontsize=\small]
+\inspirepapers{1071846}      \inspirecitations[round=1000]{1071846}
+\inspirehindex{1071846}      \inspireauthorstat{1071846}{citations}
+\end{Verbatim}
+\opt{round} rounds \emph{down}, so ``over $N$'' stays true as the real figure
+grows.
+
+\section{Plots}
+With the \opt{plots} option, \verb|\inspireplot{<id>}| draws citations per year
+for a paper and \verb|\inspireauthorplot{<id>}{papers|\texttt{|}\verb|citations}|
+the same for a person. The default is one line with axis lines only where they
+carry information; \verb|\inspireplotstyle| takes any \pkg{pgfplots} axis keys.
+
+\section{Options}
+Every option below is both a package option and a per-call option, and
+\verb|\inspiresetup{...}| changes any of them mid-document.
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Option & Default & Meaning \\
+\midrule
+\opt{cites}    & \opt{true}  & show the citation count \\
+\opt{ref}      & \opt{false} & the full reference instead of the title \\
+\opt{year}     & \opt{false} & append the publication year \\
+\opt{link}     & \opt{true}  & hyperlink the title \\
+\opt{title}    & ---         & override the fetched title \\
+\opt{round}    & \opt{1}     & round a figure down to a multiple of this \\
+\opt{sep}      & \opt{comma} & \opt{comma}, \opt{period}, \opt{space}, \opt{thin}, \opt{underscore}, \opt{none} \\
+\opt{sepstring}& ---         & any other separator \\
+\opt{style}    & \opt{latex-eu} & reference format: \opt{latex-eu} or \opt{latex-us} \\
+\opt{plots}    & \opt{false} & load \pkg{pgfplots} \\
+\opt{data}     & \opt{inspirehep-data} & basename of the generated file \\
+\opt{bib}      & \opt{inspirehep-refs} & basename of the generated \texttt{.bib} \\
+\opt{maxage}   & \opt{120}   & days before the data is called stale \\
+\opt{mincites} & \opt{1}     & counts below this print nothing \\
+\opt{fetch}    & \opt{auto}  & \opt{auto}, \opt{on} or \opt{off} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Changing how things look}
+\begin{Verbatim}[frame=single,fontsize=\small]
+\renewcommand{\inspiretitleformat}[1]{\textbf{#1}}
+\renewcommand{\inspirecitestext}[1]{#1~cites}
+\renewcommand{\inspirecitesformat}[1]{\nobreakspace{\small[#1]}}
+\renewcommand{\inspireyearformat}[1]{\hfill #1}
+\renewcommand{\inspireplotstyle}{ymajorgrids}
+\end{Verbatim}
+
+\section{Limits}
+Fetching from the package needs \texttt{curl} and unrestricted shell escape;
+the helper is the way round both. Counts are whatever INSPIRE reports,
+including self-citations.
+
+\section{Licence}
+LPPL 1.3c or later. Maintained by Lawrence Lee;
+\url{https://github.com/lawrenceleejr/inspirehep-latex}.
+
+\end{document}
