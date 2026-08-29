@@ -463,6 +463,9 @@ never fetched: \inspirepapers{20000000};
 fetched wins: \inspirepapers{1071846}
 \end{demo}
 
+\verb|\inspiredefaultstat{<key>}{<n>}| does the same for the single person
+named by the helper's \opt{--author}, who needs no id at the call site.
+
 \section{Options}
 
 Every option is both a package option and (where it makes sense per call) an
@@ -519,8 +522,14 @@ Five hooks control how things are set; redefine any of them:
 \renewcommand{\inspirecitesformat}[1]{~{\small[#1]}} % attaching them
 \renewcommand{\inspireyearformat}[1]{~(#1)}          % the year
 \renewcommand{\inspirenumformat}[1]{...}             % digit grouping itself
+\renewcommand{\inspirenumsep}{\,}                    % what goes between groups
 \renewcommand{\inspirecollabformat}[1]{#1~Collab.}   % `collab' wording
+\renewcommand{\inspiremissing}[1]{\textbf{[?~#1]}}   % the missing-data marker
 \end{code}
+
+\verb|\inspirenumsep| is the separator on its own, for a character the
+\opt{sep} option does not offer; \verb|\inspiremissing| is what an unknown id
+typesets --- the next section describes when, and this is how to restyle it.
 
 A CV-flavoured example --- the count as quiet grey metadata:
 
@@ -541,6 +550,8 @@ or patch anything by hand --- useful for records INSPIRE does not have:
 \verb|\inspiresetcites{<id>}{<n>}|            & a record's citation count \\
 \verb|\inspiresettitle{<id>}{<title>}|        & its title \\
 \verb|\inspiresetkey{<id>}{<key>}|            & its \BibTeX{} key \\
+\verb|\inspiresetrecid{<id>}{<recid>}|        & the record number behind a
+                                                texkey, so links still work \\
 \verb|\inspiresetrefauthors{<id>}{...}|       & its author list \\
 \verb|\inspiresetrefcollab{<id>}{ATLAS}|      & its collaboration, if any \\
 \verb|\inspiresetrefpub{<id>}{...}|          & journal, DOI, arXiv number \\
@@ -549,6 +560,8 @@ or patch anything by hand --- useful for records INSPIRE does not have:
                                                the four above \\
 \verb|\inspiresetyears{<id>}{(y,n) (y,n) ...}|& its citations per year \\
 \verb|\inspiresetauthorstat{<id>}{<key>}{<n>}|& a person's figure \\
+\verb|\inspiresetstat{<key>}{<n>}|            & the same, for the one person
+                                                named by \opt{--author} \\
 \verb|\inspiresetauthoryears{<id>}{<kind>}{...}| & a person's series \\
 \verb|\inspiresetfetched{<date>}{<dayno>}|    & when it was all fetched \\
 \bottomrule

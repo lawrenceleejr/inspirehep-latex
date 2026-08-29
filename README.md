@@ -157,6 +157,16 @@ handle a BibTeX key yourself.
 ... as shown in \inspirecite{1701002}.
 ```
 
+### Fallback figures
+
+Values used only until a real fetch arrives — handy for a repository's first
+build, and never overriding fetched data:
+
+```latex
+\inspiredefaultauthorstat{1071846}{papers}{1467}   % per person
+\inspiredefaultstat{papers}{1467}                  % the helper's --author
+```
+
 ## Options
 
 Every option is both a package option and a per-call option, so a document sets
@@ -233,6 +243,32 @@ Known limits:
 - One unknown id degrades on its own: a warning, a visible `[? ...]` marker in
   the output, and the rest of the document still refreshes.
 - Counts are whatever INSPIRE reports, including self-citations.
+
+## Developing
+
+```sh
+make check     # everything CI runs: lint, unit, test, doc
+make lint      # ruff, plus the checks a compiler cannot make
+make unit      # the helper's pure parts -- no network, runs in a second
+make test      # build the example and look for the numbers in the PDF
+make doc       # the manual, as inspirehep.pdf
+make ctan      # the archive to upload to CTAN
+```
+
+`make unit` is the one to run while editing: it covers the patterns that find
+records in a document, the `\input` walking, the TeX escaping, and the shape of
+the generated file, none of which touch the network.
+
+`make lint` additionally asserts what a compiler cannot see — that every public
+command and option reached the manual, that `inspirehep.sty` and the `Makefile`
+agree on the version, and that a handful of traps this package has actually
+fallen into stay fixed (an unbalanced `\ExplSyntaxOn`, a colon used as a
+separator in a data file, `pgfplots` escaping its option).
+
+CI runs all of it on every push, on three Python versions, and weekly so that a
+change at INSPIRE's end shows up here rather than in someone's document.
+Tagging `vX.Y` — matching the version in `inspirehep.sty` — builds the CTAN
+archive, checks its layout, and drafts a release with it attached.
 
 ## Licence
 

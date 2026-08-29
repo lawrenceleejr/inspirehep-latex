@@ -18,3 +18,8 @@ ctan/
 
 # copied in by `make example`
 example/inspirehep.sty
+
+# tooling
+.ruff_cache/
+example/none.txt
+example/out.txt

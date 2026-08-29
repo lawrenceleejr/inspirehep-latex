@@ -1,0 +1,14 @@
+# Lint settings for inspirehep-fetch.py and its tests.
+#
+# BLE is selected on purpose: the helper deliberately swallows broad exceptions
+# so that one unknown id cannot cost the rest of a document its refresh, and
+# each of those places carries a `noqa` saying so.  Selecting the rule is what
+# keeps those annotations meaningful rather than stale.
+line-length = 100
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "C4", "PIE", "RET", "BLE"]
+
+[lint.per-file-ignores]
+# The tests load the helper by path before importing anything from it.
+"test/*" = ["E402"]

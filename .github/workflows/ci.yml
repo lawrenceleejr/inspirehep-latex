@@ -1,13 +1,22 @@
-name: Build the example
+name: CI
 
-# Two jobs on purpose: the package has two ways to get its numbers, and both
-# are worth exercising.  Between them they also prove the claim the README
-# makes -- that the document compiles either way.
+# Four things, cheapest first, so a typo fails in twenty seconds rather than
+# after a TeX Live install:
+#
+#   lint     ruff, and the checks a compiler cannot make (see test/)
+#   test     the helper's pure parts -- patterns, paths, escaping, file shape
+#   build    the example, both ways of getting the numbers, and with none
+#   docs     the manual, kept as an artifact of every run
+#
+# Tagging v* additionally builds the CTAN archive and attaches it to a release.
+
 on:
   push:
   pull_request:
   workflow_dispatch:
   schedule:
+    # Mondays.  The scheduled run exists to notice INSPIRE changing its API
+    # under us, which nothing else here would catch.
     - cron: '23 7 * * 1'
 
 permissions:
@@ -18,8 +27,71 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ruff
+        run: pipx install ruff
+
+      - name: ruff
+        run: ruff check --output-format github .
+
+      # Every public command and option must reach the manual, the version must
+      # agree between inspirehep.sty and the Makefile, and a few traps this
+      # package has actually fallen into must stay fixed.
+      - name: Package and documentation checks
+        run: python3 test/lint_package.py
+
+  test:
+    name: unit tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The helper claims to need nothing but the standard library, on
+        # whatever Python a TeX user happens to have.
+        python: ['3.9', '3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: The standard library really is enough
+        run: |
+          python3 - <<'EOF'
+          import ast, pathlib, sys
+          tree = ast.parse(pathlib.Path("inspirehep-fetch.py").read_text())
+          imported = set()
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  imported |= {a.name.split(".")[0] for a in node.names}
+              elif isinstance(node, ast.ImportFrom) and node.module:
+                  imported.add(node.module.split(".")[0])
+          print("imports:", ", ".join(sorted(imported)))
+          # sys.stdlib_module_names arrived in 3.10; on older runners the unit
+          # tests below still prove the module imports with nothing installed.
+          known = getattr(sys, "stdlib_module_names", None)
+          if known is None:
+              print("no sys.stdlib_module_names on this Python; skipping")
+              raise SystemExit(0)
+          outside = sorted(m for m in imported if m not in known)
+          if outside:
+              raise SystemExit(f"not in the standard library: {outside}")
+          EOF
+
+      - name: Unit tests
+        run: python3 -m unittest discover -s test -v
+
   build:
-    name: ${{ matrix.how }}
+    name: example (${{ matrix.fetch }})
+    needs: [lint, test]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -63,14 +135,143 @@ jobs:
             || { echo 'no author-level figure in the output'; cat out.txt; exit 1; }
           echo 'OK'
 
-      - name: Build the manual
+      # The package's central promise is that a document always compiles: on a
+      # machine with no network, on Overleaf, on a checkout that has never
+      # fetched anything.  With the data file gone every figure is unknown, and
+      # the result must still be a PDF -- carrying visible [? ...] markers
+      # rather than a stopped compile or a silently wrong number.
+      - name: Compiles with no data at all
         if: matrix.fetch == 'python'
-        run: make doc
+        working-directory: example
+        run: |
+          set -e
+          rm -f inspirehep-data.tex
+          pdflatex -interaction=nonstopmode example.tex
+          pdftotext example.pdf - > none.txt
+          grep -q '\[?' none.txt \
+            || { echo 'expected [? ...] markers with no data'; cat none.txt; exit 1; }
+          echo 'OK: still a PDF, and it says what it does not know'
 
       - uses: actions/upload-artifact@v4
         with:
           name: example-${{ matrix.fetch }}
-          path: |
-            example/example.pdf
-            inspirehep.pdf
+          path: example/example.pdf
           if-no-files-found: error
+
+  docs:
+    name: manual
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install TeX Live
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            texlive-latex-base texlive-latex-recommended texlive-latex-extra \
+            texlive-fonts-recommended texlive-pictures poppler-utils
+
+      - name: Build the manual
+        run: make doc
+
+      # Every example in the manual is executed rather than transcribed, so a
+      # command that stopped working shows up here -- but pdflatex runs with
+      # -interaction=nonstopmode and would otherwise still report success.
+      - name: The manual must be clean
+        run: |
+          set -e
+          errors=$(grep -cE '^!' inspirehep-doc.log || true)
+          undefined=$(grep -c 'Undefined control sequence' inspirehep-doc.log || true)
+          echo "errors: $errors, undefined control sequences: $undefined"
+          if [ "$errors" -ne 0 ] || [ "$undefined" -ne 0 ]; then
+            grep -nE '^(!|l\.[0-9])' inspirehep-doc.log | head -30
+            exit 1
+          fi
+          pages=$(pdfinfo inspirehep.pdf | awk '/^Pages:/ { print $2 }')
+          echo "pages: $pages"
+          [ "$pages" -ge 8 ] || { echo 'the manual has lost most of itself'; exit 1; }
+          # Two [? ...] markers belong in the manual: the missing-data demo,
+          # which asks for id 999999999 on purpose, and the literal default of
+          # \inspiremissing shown in a code listing.  Any other marker means a
+          # lookup the manual meant to succeed did not.
+          stray=$(pdftotext inspirehep.pdf - \
+                  | grep -o '\[?[^]]*\]' | sort -u \
+                  | grep -v '999999999' | grep -v '#1' || true)
+          if [ -n "$stray" ]; then
+            echo 'the manual shipped a marker for a lookup that should have worked:'
+            echo "$stray"
+            exit 1
+          fi
+          echo 'OK'
+
+      - name: Summarise
+        if: always()
+        run: |
+          {
+            echo '## Manual'
+            echo
+            if [ -f inspirehep.pdf ]; then
+              echo '| Pages | Size |'
+              echo '| ----: | ---: |'
+              echo "| $(pdfinfo inspirehep.pdf | awk '/^Pages:/ { print $2 }') | $(du -h inspirehep.pdf | cut -f1) |"
+            else
+              echo 'The manual did not build.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manual
+          path: inspirehep.pdf
+          if-no-files-found: error
+          retention-days: 90
+
+  release:
+    name: CTAN archive
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, docs]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # only this job writes, and only to draft a release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install TeX Live
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            texlive-latex-base texlive-latex-recommended texlive-latex-extra \
+            texlive-fonts-recommended texlive-pictures poppler-utils zip
+
+      - name: Build the archive
+        run: make ctan
+
+      # CTAN rejects an archive whose top level is not a single directory named
+      # for the package, so that is worth failing on here rather than there.
+      - name: The archive must be shaped the way CTAN wants
+        run: |
+          set -e
+          top=$(unzip -Z1 inspirehep.zip | cut -d/ -f1 | sort -u)
+          [ "$top" = inspirehep ] \
+            || { echo "top level is '$top', expected a single 'inspirehep'"; exit 1; }
+          for required in inspirehep.sty inspirehep.pdf README.md LICENSE; do
+            unzip -Z1 inspirehep.zip | grep -qx "inspirehep/$required" \
+              || { echo "missing from the archive: $required"; exit 1; }
+          done
+          # The tag must agree with what the package says about itself.
+          tag=${GITHUB_REF_NAME#v}
+          declared=$(sed -n 's/.*\\ProvidesPackage{inspirehep}\[[0-9/]* v\([0-9.]*\).*/\1/p' inspirehep.sty)
+          [ "$tag" = "$declared" ] \
+            || { echo "tag v$tag but inspirehep.sty declares v$declared"; exit 1; }
+          unzip -Z1 inspirehep.zip
+          echo 'OK'
+
+      - name: Draft the release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: inspirehep.zip
+          body: |
+            `inspirehep.zip` is the archive to upload at
+            https://ctan.org/upload — see `CTAN.md` for the fields it asks for.

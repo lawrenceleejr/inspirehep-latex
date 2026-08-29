@@ -54,14 +54,14 @@ TEXKEY_RE = re.compile(r"^[A-Za-z][\w.'-]*:\d{4}[A-Za-z0-9]+$")
 # scanned from its root without listing every chapter.
 INPUT_RE = re.compile(r"\\(?:input|include|subfile)\s*\{\s*([^}]+?)\s*\}")
 
-RECORD_RE = re.compile(r"\\inspire(?:pub|cites|title|ref|year)\s*" + _OPT + r"\s*\{\s*" + _ID + r"\s*\}")
+RECORD_RE = re.compile(r"\\inspire(?:pub|cites|title|ref|year)\s*"
+                       + _OPT + r"\s*\{\s*" + _ID + r"\s*\}")
 PLOT_RE = re.compile(r"\\inspireplot\s*" + _OPT + r"\s*\{\s*" + _ID + r"\s*\}")
 # \inspirecite / \inspirekey, but not \inspirecites: the \s*{ guard sees to that.
 BIB_RE = re.compile(r"\\inspire(?:cite|key)\s*\{\s*" + _ID + r"\s*\}")
 AUTHOR_USE_RE = re.compile(
     r"\\inspire(?:papers|citations|hindex|authorstat|authorplot)\s*"
     + _OPT + r"\s*\{\s*([A-Za-z0-9.\-]+)\s*\}")
-URL_AUTHOR_RE = re.compile(r"inspirehep\.net/authors/(\d+)")
 
 
 def day_number(d: datetime.date) -> int:
@@ -146,7 +146,7 @@ def fetch_formatted(recid: str, style: str) -> dict[str, str]:
     seen_title = False
     for line in raw.splitlines():
         line = line.strip()
-        if not line or line.startswith("\\bibitem") or line.startswith("%\\cite"):
+        if not line or line.startswith(("\\bibitem", "%\\cite")):
             continue
         if re.match(r"^%\s*\d+\s+citations?\s+counted", line):
             continue
@@ -195,7 +195,7 @@ def fetch_records(recids: list[str], style: str = "latex-eu") -> dict[str, dict]
     for hit in result["hits"]["hits"]:
         meta = hit["metadata"]
         control = str(meta["control_number"])
-        keys = {k for k in meta.get("texkeys") or []}
+        keys = set(meta.get("texkeys") or [])
         for wanted in recids:
             if wanted != control and wanted not in keys:
                 continue
@@ -329,18 +329,20 @@ def walk_inputs(roots: list[Path], base: Path | None = None,
     return found
 
 
-def discover(sources: list[Path]) -> tuple[list[str], str | None]:
+def discover(sources: list[Path]) -> dict[str, list[str]]:
+    """What the sources ask for, by the commands they use.
+
+    There is no author= package option -- a document may discuss several people
+    -- so the authors are exactly the ones its commands name, and nothing is
+    inferred from, say, an INSPIRE author link in the prose.
+    """
     text = "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in sources)
-    # There is no author= package option any more -- a document may discuss
-    # several people -- so the authors are exactly the ones its commands name.
-    author = None
-    wanted = {
+    return {
         "records": sorted(set(RECORD_RE.findall(text)) | set(BIB_RE.findall(text))),
         "plots":   sorted(set(PLOT_RE.findall(text))),
         "bibtex":  sorted(set(BIB_RE.findall(text))),
-        "authors": sorted(set(AUTHOR_USE_RE.findall(text)) | ({author} if author else set())),
+        "authors": sorted(set(AUTHOR_USE_RE.findall(text))),
     }
-    return wanted, author
 
 
 def render(records: dict, plots: dict, authors: dict, author_years: dict,
@@ -398,9 +400,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=Path("inspirehep-data.tex"),
                         help="file to write (default: %(default)s)")
     parser.add_argument("--bib", type=Path, default=Path("inspirehep-refs.bib"),
-                        help="BibTeX file for records used with \\inspirecite (default: %(default)s)")
+                        help="BibTeX file for records used with \\inspirecite "
+                             "(default: %(default)s)")
     parser.add_argument("--author", default=None,
-                        help="INSPIRE author recid or BAI (default: the author= option in your sources)")
+                        help="INSPIRE author recid or BAI, also given the short "
+                             "\\inspiresetstat form (default: only the people "
+                             "the sources name)")
     parser.add_argument("--no-follow", dest="follow", action="store_false",
                         help="do not follow \\input/\\include from the files given")
     parser.add_argument("--style", default="latex-eu", choices=["latex-eu", "latex-us"],
@@ -420,10 +425,10 @@ def main(argv: list[str] | None = None) -> int:
         print("no LaTeX sources to scan", file=sys.stderr)
         return 1
 
-    wanted, found_author = discover(sources)
-    primary = args.author or found_author
-    if args.author and found_author != args.author:
-        wanted["authors"] = sorted(set(wanted["authors"]) | {args.author})
+    wanted = discover(sources)
+    primary = args.author
+    if primary:
+        wanted["authors"] = sorted(set(wanted["authors"]) | {primary})
     print(f"Scanning {len(sources)} file(s): {len(wanted['records'])} record(s), "
           f"{len(wanted['plots'])} plot(s), {len(wanted['bibtex'])} citation(s), "
           f"{len(wanted['authors'])} author(s)")
@@ -455,7 +460,8 @@ def main(argv: list[str] | None = None) -> int:
     plots, authors, author_years, bibs = {}, {}, {}, {}
     for recid in wanted["plots"]:
         numeric = records.get(recid, {}).get("recid", recid)
-        if (years := attempt(f"plot {recid}", fetch_years, f"refersto recid {numeric}")) is not None:
+        years = attempt(f"plot {recid}", fetch_years, f"refersto recid {numeric}")
+        if years is not None:
             plots[recid] = years
     for aid in wanted["authors"]:
         if (bai := attempt(f"author {aid}", resolve_bai, aid)) is None:

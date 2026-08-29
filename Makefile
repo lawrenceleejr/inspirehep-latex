@@ -2,7 +2,10 @@
 PKG     = inspirehep
 VERSION = 2.0
 
-.PHONY: doc example test clean ctan
+.PHONY: all doc example test unit lint check clean ctan
+
+# What CI runs, and what to run before pushing.
+check: lint unit test doc
 
 doc: $(PKG).pdf
 
@@ -21,10 +24,22 @@ test: example
 	cd example && pdftotext example.pdf - | grep -qE '\[[0-9]+ citations?\]'
 	@echo "OK"
 
+# The pure parts of the helper: patterns, path walking, escaping, file shape.
+# No network, so this is the check to run while editing.
+unit:
+	python3 -m unittest discover -s test -v
+
+# ruff for the helper; lint_package.py for the things a compiler cannot see --
+# a command that never reached the manual, a version that disagrees with the
+# Makefile, an expl3 block left open.
+lint:
+	ruff check .
+	python3 test/lint_package.py
+
 # CTAN takes a single archive whose top level is one directory named for the
 # package, holding the sources, the built documentation, the README, and the
 # licence.
-ctan: doc
+ctan: doc example/inspirehep-data.tex
 	rm -rf ctan/$(PKG) $(PKG).zip
 	mkdir -p ctan/$(PKG)/example
 	cp $(PKG).sty $(PKG)-doc.tex $(PKG)-doc-data.tex $(PKG).pdf $(PKG)-fetch.py \
@@ -32,6 +47,11 @@ ctan: doc
 	cp example/example.tex example/inspirehep-data.tex ctan/$(PKG)/example/
 	cd ctan && zip -qr ../$(PKG).zip $(PKG)
 	@echo "wrote $(PKG).zip"
+
+# Tracked, so a fresh clone already has it; this is for a clone that does not,
+# which would otherwise fail the copy below with a confusing message.
+example/inspirehep-data.tex:
+	cd example && python3 ../$(PKG)-fetch.py example.tex
 
 clean:
 	rm -f *.aux *.log *.out *.toc *.vrb $(PKG)-doc.pdf
