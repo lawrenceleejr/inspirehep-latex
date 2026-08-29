@@ -389,4 +389,4 @@ archive, checks its layout, and drafts a release with it attached.
 
 ## Licence
 
-MIT. See `LICENSE`.
+LPPL 1.3c. See `LICENSE`.
