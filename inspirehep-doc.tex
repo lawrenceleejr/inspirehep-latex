@@ -150,12 +150,20 @@ one implementation of the API handling. The helper alone needs only
 common case it takes no arguments. Neither is needed to \emph{typeset}.
 
 \paragraph{Multi-file documents.}
-The automatic fetch scans only the main file. If your ids live in
-\verb|\input| files, run the helper yourself and list them:
+Point either fetcher at the main file and it follows \verb|\input|,
+\verb|\include| and \verb|\subfile| from there, however deeply nested:
 
 \begin{code}
-python3 inspirehep-fetch.py main.tex chapters/*.tex
+python3 inspirehep-fetch.py main.tex
+  Scanning 4 file(s): 3 record(s), 0 plot(s), 0 citation(s), 1 author(s)
 \end{code}
+
+Names resolve the way \LaTeX{} resolves them --- relative to the main
+document's directory --- and then, failing that, relative to the file doing the
+including, which is what \pkg{subfiles} and \pkg{import} do. A file that
+cannot be found is skipped (it may be generated, or inside a conditional), and
+a cycle of \verb|\input|s terminates rather than looping. Pass
+\opt{-{}-no-follow} to scan only the files you name.
 
 \paragraph{Overleaf.}
 Overleaf disables shell escape and its compile servers have no network, so
@@ -239,11 +247,36 @@ logic in this package to get wrong.
 \inspireref[cites=false]{1701002}
 \end{demo}
 
-By default it, too, carries the count (\opt{cites=false} above turned it
-off). The \opt{style} option picks INSPIRE's European numbering
-(\opt{latex-eu}, the default: volume (year) page) or American
-(\opt{latex-us}: volume, page (year)); it applies at fetch time, so set it as
-a package option.
+By default it, too, carries the count (\opt{cites=false} above turned it off).
+
+INSPIRE records errata, which a CV usually does not want, so they are off by
+default. \opt{errata} puts them back:
+
+\begin{demo}
+\inspireref[cites=false, errata]{1701002}
+\end{demo}
+
+A collaboration paper is credited by INSPIRE to its first author and
+\emph{et al.}; \opt{collab} credits the collaboration instead, which is the
+usual convention in a publication list:
+
+\begin{demo}
+\inspireref[cites=false]{2752508}
+\end{demo}
+
+\begin{demo}
+\inspireref[cites=false, collab]{2752508}
+\end{demo}
+
+The wording is \verb|\inspirecollabformat|, so
+\verb|\renewcommand{\inspirecollabformat}[1]{#1}| gives a bare
+``ATLAS''. Both options work per call or document-wide --- the reference is
+stored in its parts and assembled as it is typeset, so switching either one
+never means refetching.
+
+The \opt{style} option picks INSPIRE's European numbering (\opt{latex-eu}, the
+default: volume (year) page) or American (\opt{latex-us}: volume, page (year));
+that one does apply at fetch time, so set it as a package option.
 
 \subsection{A \texttt{.bib} file you never write}
 
@@ -417,6 +450,9 @@ Option & Default & Meaning \\
 \opt{cites}     & \opt{true}  & show the citation count \\
 \opt{ref}       & \opt{false} & full reference instead of the title \\
 \opt{year}      & \opt{false} & append the publication year \\
+\opt{errata}    & \opt{false} & include any erratum in a reference \\
+\opt{collab}    & \opt{false} & credit a collaboration paper to the
+                                collaboration rather than to its first author \\
 \opt{link}      & \opt{true}  & hyperlink the title (needs \pkg{hyperref};
                                 plain text without it) \\
 \opt{title}     & ---         & override the fetched title \\
@@ -456,6 +492,7 @@ Five hooks control how things are set; redefine any of them:
 \renewcommand{\inspirecitesformat}[1]{~{\small[#1]}} % attaching them
 \renewcommand{\inspireyearformat}[1]{~(#1)}          % the year
 \renewcommand{\inspirenumformat}[1]{...}             % digit grouping itself
+\renewcommand{\inspirecollabformat}[1]{#1~Collab.}   % `collab' wording
 \end{code}
 
 A CV-flavoured example --- the count as quiet grey metadata:
@@ -477,7 +514,12 @@ or patch anything by hand --- useful for records INSPIRE does not have:
 \verb|\inspiresetcites{<id>}{<n>}|            & a record's citation count \\
 \verb|\inspiresettitle{<id>}{<title>}|        & its title \\
 \verb|\inspiresetkey{<id>}{<key>}|            & its \BibTeX{} key \\
-\verb|\inspiresetref{<id>}{<reference>}|      & its formatted reference \\
+\verb|\inspiresetrefauthors{<id>}{...}|       & its author list \\
+\verb|\inspiresetrefcollab{<id>}{ATLAS}|      & its collaboration, if any \\
+\verb|\inspiresetrefpub{<id>}{...}|          & journal, DOI, arXiv number \\
+\verb|\inspiresetreferrata{<id>}{...}|       & any erratum \\
+\verb|\inspiresetref{<id>}{<reference>}|     & a whole reference, overriding
+                                               the four above \\
 \verb|\inspiresetyears{<id>}{(y,n) (y,n) ...}|& its citations per year \\
 \verb|\inspiresetauthorstat{<id>}{<key>}{<n>}|& a person's figure \\
 \verb|\inspiresetauthoryears{<id>}{<kind>}{...}| & a person's series \\
@@ -492,8 +534,7 @@ Typesetting needs a current \LaTeX{} (\pkg{xparse} and \pkg{l3keys2e} from the
 kernel), plus \pkg{pgfplots} if and only if you pass \opt{plots}. Refreshing
 the data needs \texttt{python3} (standard library only); the self-fetch
 additionally needs unrestricted shell escape. Counts are whatever INSPIRE
-reports, self-citations included. The automatic fetch scans only the main
-file; the helper takes a file list.
+reports, self-citations included.
 
 \section{Licence}
 

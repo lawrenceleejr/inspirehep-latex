@@ -37,6 +37,8 @@
 \bool_new:N \l_inspirehep_cites_bool
 \bool_new:N \l_inspirehep_ref_bool
 \bool_new:N \l_inspirehep_year_bool
+\bool_new:N \l_inspirehep_errata_bool
+\bool_new:N \l_inspirehep_collab_bool
 \bool_new:N \l_inspirehep_link_bool
 \tl_new:N   \l_inspirehep_title_tl
 \int_new:N  \l_inspirehep_round_int
@@ -58,6 +60,13 @@
     ref     .initial:n    = { false },
     year    .bool_set:N   = \l_inspirehep_year_bool,
     year    .initial:n    = { false },
+    % INSPIRE's reference carries any erratum; most CVs do not want it.
+    errata  .bool_set:N   = \l_inspirehep_errata_bool,
+    errata  .initial:n    = { false },
+    % Credit a collaboration paper to the collaboration rather than to the
+    % first author and "et al." -- the usual convention in a CV.
+    collab  .bool_set:N   = \l_inspirehep_collab_bool,
+    collab  .initial:n    = { false },
     link    .bool_set:N   = \l_inspirehep_link_bool,
     link    .initial:n    = { true },
     title   .tl_set:N     = \l_inspirehep_title_tl,
@@ -131,7 +140,11 @@
 \prop_new:N \g_inspirehep_cites_prop
 \prop_new:N \g_inspirehep_title_prop
 \prop_new:N \g_inspirehep_key_prop
-\prop_new:N \g_inspirehep_ref_prop
+\prop_new:N \g_inspirehep_ref_prop          % a whole reference, set by hand
+\prop_new:N \g_inspirehep_refauthors_prop
+\prop_new:N \g_inspirehep_refpub_prop
+\prop_new:N \g_inspirehep_referrata_prop
+\prop_new:N \g_inspirehep_refcollab_prop
 \prop_new:N \g_inspirehep_years_prop
 \prop_new:N \g_inspirehep_stat_prop
 \prop_new:N \g_inspirehep_ayears_prop
@@ -151,7 +164,11 @@
 \NewDocumentCommand \inspiresetcites      { m m }   { \prop_gput:Nnn \g_inspirehep_cites_prop {#1} {#2} }
 \NewDocumentCommand \inspiresettitle      { m m }   { \prop_gput:Nnn \g_inspirehep_title_prop {#1} {#2} }
 \NewDocumentCommand \inspiresetkey        { m m }   { \prop_gput:Nnn \g_inspirehep_key_prop   {#1} {#2} }
-\NewDocumentCommand \inspiresetref        { m m }   { \prop_gput:Nnn \g_inspirehep_ref_prop   {#1} {#2} }
+\NewDocumentCommand \inspiresetref         { m m }   { \prop_gput:Nnn \g_inspirehep_ref_prop         {#1} {#2} }
+\NewDocumentCommand \inspiresetrefauthors  { m m }   { \prop_gput:Nnn \g_inspirehep_refauthors_prop  {#1} {#2} }
+\NewDocumentCommand \inspiresetrefpub      { m m }   { \prop_gput:Nnn \g_inspirehep_refpub_prop      {#1} {#2} }
+\NewDocumentCommand \inspiresetreferrata   { m m }   { \prop_gput:Nnn \g_inspirehep_referrata_prop   {#1} {#2} }
+\NewDocumentCommand \inspiresetrefcollab   { m m }   { \prop_gput:Nnn \g_inspirehep_refcollab_prop   {#1} {#2} }
 \NewDocumentCommand \inspiresetyears      { m m }   { \prop_gput:Nnn \g_inspirehep_years_prop {#1} {#2} }
 \NewDocumentCommand \inspiresetstat       { m m }   { \prop_gput:Nnn \g_inspirehep_stat_prop  {#1} {#2} }
 \NewDocumentCommand \inspiresetauthorstat { m m m } { \prop_gput:Nnn \g_inspirehep_stat_prop  {#1/#2} {#3} }
@@ -242,14 +259,62 @@
       { \tl_use:N \l_tmpa_tl } { \inspiremissing { title~#1 } }
   }
 
-%% \inspireref{<id>} -- the full reference, exactly as INSPIRE formats it.
+%% \inspirehep_ref:n -- the reference, assembled from the parts INSPIRE's own
+%% renderer produced.  Keeping them apart is what lets `errata' and `collab' be
+%% ordinary options rather than choices frozen when the data was fetched.
+%%
+%% A whole reference set by hand with \inspiresetref wins over the parts, so an
+%% entry INSPIRE does not carry can still be written out in full.
+\providecommand \inspirecollabformat [1] { #1~Collaboration }
+
+\cs_new_protected:Npn \inspirehep_ref:n #1
+  {
+    \prop_get:NnNTF \g_inspirehep_ref_prop {#1} \l_tmpa_tl
+      { \tl_use:N \l_tmpa_tl }
+      {
+        % who
+        \bool_lazy_and:nnTF
+          { \l_inspirehep_collab_bool }
+          { \prop_if_in_p:Nn \g_inspirehep_refcollab_prop {#1} }
+          {
+            \prop_get:NnN \g_inspirehep_refcollab_prop {#1} \l_tmpa_tl
+            \inspirecollabformat { \tl_use:N \l_tmpa_tl }
+          }
+          {
+            \prop_get:NnNT \g_inspirehep_refauthors_prop {#1} \l_tmpa_tl
+              { \tl_use:N \l_tmpa_tl }
+          }
+        % title
+        \prop_get:NnNT \g_inspirehep_title_prop {#1} \l_tmpa_tl
+          { ,~ `` \tl_use:N \l_tmpa_tl ,'' }
+        % where
+        \prop_get:NnNT \g_inspirehep_refpub_prop {#1} \l_tmpa_tl
+          { ~ \tl_use:N \l_tmpa_tl }
+        % and the erratum, if asked for
+        \bool_if:NT \l_inspirehep_errata_bool
+          {
+            \prop_get:NnNT \g_inspirehep_referrata_prop {#1} \l_tmpa_tl
+              { ~ \tl_use:N \l_tmpa_tl }
+          }
+      }
+  }
+
+\cs_new_protected:Npn \inspirehep_has_ref:nTF #1
+  {
+    \bool_lazy_or:nnTF
+      { \prop_if_in_p:Nn \g_inspirehep_ref_prop {#1} }
+      { \prop_if_in_p:Nn \g_inspirehep_refpub_prop {#1} }
+  }
+
+%% \inspireref[<options>]{<id>} -- the full reference.
 \NewDocumentCommand \inspireref { O{} m }
   {
     \group_begin:
       \keys_set:nn { inspirehep } {#1}
       \inspirehep_want:Nn \g_inspirehep_records_seq {#2}
-      \inspirehep_lookup:NnnTF \g_inspirehep_ref_prop {#2} \l_tmpa_tl
-        { \tl_use:N \l_tmpa_tl } { \inspiremissing { ref~#2 } }
+      \inspirehep_has_ref:nTF {#2}
+        { \inspirehep_ref:n {#2} }
+        { \bool_gset_true:N \g_inspirehep_missing_bool \inspiremissing { ref~#2 } }
       \bool_if:NT \l_inspirehep_cites_bool { \inspirecites {#2} }
     \group_end:
   }
@@ -276,9 +341,9 @@
       \inspirehep_want:Nn \g_inspirehep_records_seq {#2}
       \bool_if:NTF \l_inspirehep_ref_bool
         {
-          \inspirehep_lookup:NnnTF \g_inspirehep_ref_prop {#2} \l_tmpa_tl
-            { \inspirehep_show:nn {#2} { \tl_use:N \l_tmpa_tl } }
-            { \inspiremissing { ref~#2 } }
+          \inspirehep_has_ref:nTF {#2}
+            { \inspirehep_show:nn {#2} { \inspirehep_ref:n {#2} } }
+            { \bool_gset_true:N \g_inspirehep_missing_bool \inspiremissing { ref~#2 } }
         }
         {
           \tl_if_empty:NTF \l_inspirehep_title_tl
@@ -304,7 +369,7 @@
 \NewDocumentCommand \inspireyear { m }
   {
     \inspirehep_want:Nn \g_inspirehep_records_seq {#1}
-    \prop_get:NnNTF \g_inspirehep_ref_prop {#1} \l_tmpa_tl
+    \prop_get:NnNTF \g_inspirehep_refpub_prop {#1} \l_tmpa_tl
       {
         \regex_extract_once:nVNTF { \((\d{4})\) } \l_tmpa_tl \l_tmpa_seq
           { \inspireyearformat { \seq_item:Nn \l_tmpa_seq { 2 } } }

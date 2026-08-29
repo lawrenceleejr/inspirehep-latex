@@ -46,6 +46,10 @@ USER_AGENT = "inspirehep-latex/1.0 (+https://github.com/lawrenceleejr/inspirehep
 # facet only for what is plotted, BibTeX only for what is cited.  Every command
 # takes an optional [key=value] argument, which the patterns have to skip.
 _OPT = r"(?:\[[^\]]*\])?"
+# \input{f}, \include{f} and \subfile{f}, so a multi-file document can be
+# scanned from its root without listing every chapter.
+INPUT_RE = re.compile(r"\\(?:input|include|subfile)\s*\{\s*([^}]+?)\s*\}")
+
 RECORD_RE = re.compile(r"\\inspire(?:pub|cites|title|ref|year)\s*" + _OPT + r"\s*\{\s*(\d+)\s*\}")
 PLOT_RE = re.compile(r"\\inspireplot\s*" + _OPT + r"\s*\{\s*(\d+)\s*\}")
 # \inspirecite / \inspirekey, but not \inspirecites: the \s*{ guard sees to that.
@@ -109,38 +113,56 @@ def tex_escape(text: str) -> str:
     return "".join(out)
 
 
-def fetch_formatted(recid: str, style: str) -> str:
-    """The reference as INSPIRE itself renders it, in latex-eu or latex-us.
+def fetch_formatted(recid: str, style: str) -> dict[str, str]:
+    """INSPIRE's own rendered reference, split into the parts a document may
+    want to recombine.
 
-    Using INSPIRE's own formatting rather than assembling one from the metadata
-    means the result matches what everyone else in the field cites, errata and
-    all, and there is no author-list or journal-abbreviation logic to get wrong.
+    Using INSPIRE's formatting rather than assembling one from the metadata
+    means the result matches what everyone else in the field cites, and there
+    is no author-list or journal-abbreviation logic here to get wrong.  But a
+    single pre-formatted string would make `errata' and `collab' choices that
+    could only be made when fetching, so the block is taken apart instead and
+    the package puts it back together at typeset time.
 
-    The response is a \\bibitem block: the \\cite and \\bibitem lines are
-    dropped, the title -- which INSPIRE comments out -- is restored, and the
-    trailing "N citations counted in INSPIRE" note is left off because the
-    package tracks that itself and it would otherwise go stale in the file.
+    The response is always shaped the same way::
+
+        %\\cite{key}
+        \\bibitem{key}
+        <author line(s)>
+        %``<title>,''
+        <publication line(s), possibly including [erratum: ...]>
+        %<n> citations counted in INSPIRE as of <date>
     """
     url = f"{API}/literature/{recid}?format={style}"
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=60) as response:
         raw = response.read().decode("utf-8", "replace")
 
-    parts = []
+    authors, pub, errata = [], [], []
+    seen_title = False
     for line in raw.splitlines():
         line = line.strip()
         if not line or line.startswith("\\bibitem") or line.startswith("%\\cite"):
             continue
         if re.match(r"^%\s*\d+\s+citations?\s+counted", line):
             continue
-        if line.startswith("%"):                    # the commented-out title
-            title = line.lstrip("%").strip()
-            title = title.strip("`").rstrip(",").rstrip("'").strip()
-            if title:
-                parts.append("``" + title + "''")
+        if line.startswith("%"):          # the commented-out title separates the two halves
+            seen_title = True
             continue
-        parts.append(line)
-    return " ".join(parts).strip()
+        if not seen_title:
+            authors.append(line)
+        elif line.startswith("[erratum:"):
+            errata.append(line)
+        else:
+            pub.append(line)
+
+    return {
+        # The trailing comma is INSPIRE's, joining authors to title; the
+        # package supplies its own punctuation, so drop it.
+        "authors": " ".join(authors).strip().rstrip(","),
+        "pub": " ".join(pub).strip(),
+        "errata": " ".join(errata).strip(),
+    }
 
 
 def fetch_records(recids: list[str], style: str = "latex-eu") -> dict[str, dict]:
@@ -164,13 +186,15 @@ def fetch_records(recids: list[str], style: str = "latex-eu") -> dict[str, dict]
             "cites": int(meta.get("citation_count") or 0),
             "title": tex_escape(meta["titles"][0]["title"]) if meta.get("titles") else "",
             "key": (meta.get("texkeys") or [""])[0],
-            "ref": "",
+            "ref": {},
+            "collab": (meta.get("collaborations") or [{}])[0].get("value", ""),
         }
     for recid in records:
         try:
             records[recid]["ref"] = fetch_formatted(recid, style)
         except Exception as exc:  # noqa: BLE001 - a missing reference is not fatal
             print(f"  ! no {style} reference for {recid}: {exc}", file=sys.stderr)
+            records[recid]["ref"] = {}
     missing = sorted(set(recids) - set(records))
     if missing:
         print(f"  ! no INSPIRE record for: {', '.join(missing)}", file=sys.stderr)
@@ -248,6 +272,45 @@ def series(pairs: list[tuple[str, int]]) -> str:
     return " ".join(f"({year},{count})" for year, count in pairs)
 
 
+def walk_inputs(roots: list[Path], base: Path | None = None,
+                seen: set[Path] | None = None) -> list[Path]:
+    """Every file reachable from `roots` through \\input, \\include or \\subfile.
+
+    LaTeX resolves \\input relative to the directory the compile was started
+    in -- the main document's -- not relative to the file doing the including,
+    so that is tried first.  Resolving relative to the including file is tried
+    second, because the `subfiles' and `import' packages do work that way and
+    it costs nothing to support both.
+
+    A name that resolves to nothing is skipped: it may be generated, or inside
+    a conditional, and neither is this script's business.  `seen' keeps a cycle
+    from looping forever.
+    """
+    if seen is None:
+        seen = set()
+    found = []
+    for root in roots:
+        root = root.resolve()
+        if root in seen or not root.is_file():
+            continue
+        seen.add(root)
+        found.append(root)
+        here = base if base is not None else root.parent
+
+        children = []
+        for name in INPUT_RE.findall(root.read_text(encoding="utf-8", errors="replace")):
+            for candidate in (here / name, root.parent / name):
+                for path in (candidate, candidate.with_suffix(".tex")):
+                    if path.is_file():
+                        children.append(path)
+                        break
+                else:
+                    continue
+                break
+        found.extend(walk_inputs(children, here, seen))
+    return found
+
+
 def discover(sources: list[Path]) -> tuple[list[str], str | None]:
     text = "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in sources)
     # There is no author= package option any more -- a document may discuss
@@ -275,8 +338,11 @@ def render(records: dict, plots: dict, authors: dict, author_years: dict,
             out.append(f"\\inspiresettitle{{{recid}}}{{{r['title']}}}")
         if r["key"]:
             out.append(f"\\inspiresetkey{{{recid}}}{{{r['key']}}}")
-        if r["ref"]:
-            out.append(f"\\inspiresetref{{{recid}}}{{{r['ref']}}}")
+        if r.get("collab"):
+            out.append(f"\\inspiresetrefcollab{{{recid}}}{{{r['collab']}}}")
+        for part in ("authors", "pub", "errata"):
+            if r["ref"].get(part):
+                out.append(f"\\inspiresetref{part}{{{recid}}}{{{r['ref'][part]}}}")
     for recid in sorted(plots, key=int, reverse=True):
         out.append(f"\\inspiresetyears{{{recid}}}{{{series(plots[recid])}}}")
 
@@ -315,6 +381,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="BibTeX file for records used with \\inspirecite (default: %(default)s)")
     parser.add_argument("--author", default=None,
                         help="INSPIRE author recid or BAI (default: the author= option in your sources)")
+    parser.add_argument("--no-follow", dest="follow", action="store_false",
+                        help="do not follow \\input/\\include from the files given")
     parser.add_argument("--style", default="latex-eu", choices=["latex-eu", "latex-us"],
                         help="INSPIRE reference format (default: %(default)s)")
     parser.add_argument("--strict", action="store_true",
@@ -323,8 +391,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="write to stdout instead of a file")
     args = parser.parse_args(argv)
 
-    sources = args.sources or sorted(args.output.resolve().parent.glob("*.tex"))
-    sources = [p for p in sources if p.resolve() != args.output.resolve()]
+    roots = args.sources or sorted(args.output.resolve().parent.glob("*.tex"))
+    sources = walk_inputs([Path(p) for p in roots]) if args.follow else \
+        [Path(p).resolve() for p in roots if Path(p).is_file()]
+    generated = {args.output.resolve(), args.bib.resolve()}
+    sources = [p for p in sources if p not in generated]
     if not sources:
         print("no LaTeX sources to scan", file=sys.stderr)
         return 1

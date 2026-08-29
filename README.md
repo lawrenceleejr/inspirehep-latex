@@ -142,6 +142,8 @@ house style once and any one entry can depart from it.
 | `cites` | `true` | show the citation count |
 | `ref` | `false` | show the full reference instead of the title |
 | `year` | `false` | append the publication year |
+| `errata` | `false` | include any erratum in a reference |
+| `collab` | `false` | credit a collaboration paper to the collaboration rather than its first author |
 | `link` | `true` | hyperlink the title |
 | `title` | *(none)* | override the fetched title |
 | `round` | `1` | round a figure down to a multiple of this |
@@ -199,8 +201,10 @@ Known limits:
 
 - Refreshing needs `python3` (standard library only); the self-fetch
   additionally needs unrestricted shell escape. Neither is needed to typeset.
-- The automatic fetch scans only the main file; for `\input`-structured
-  documents, run the helper yourself with the file list.
+- Both fetchers follow `\input`, `\include` and `\subfile` from the main
+  file, resolving names as LaTeX does (relative to the main document) and then
+  relative to the including file, as `subfiles` and `import` do. `--no-follow`
+  scans only the files named.
 - One unknown id degrades on its own: a warning, a visible `[? ...]` marker in
   the output, and the rest of the document still refreshes.
 - Counts are whatever INSPIRE reports, including self-citations.
