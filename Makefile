@@ -22,7 +22,7 @@ test: example
 	@echo "OK"
 
 # CTAN takes a single archive whose top level is one directory named for the
-# package, holding the sources, the built documentation, the README and the
+# package, holding the sources, the built documentation, the README, and the
 # licence.
 ctan: doc
 	rm -rf ctan/$(PKG) $(PKG).zip

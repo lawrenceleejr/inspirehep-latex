@@ -2,7 +2,7 @@
 
 `make ctan` builds `inspirehep.zip` in the layout CTAN expects: a single
 top-level directory named for the package, holding the sources, the built
-documentation, the README and the licence.
+documentation, the README, and the licence.
 
 Upload it at <https://ctan.org/upload> with:
 
@@ -11,7 +11,7 @@ Upload it at <https://ctan.org/upload> with:
 | Package name | `inspirehep` |
 | Version | see `\ProvidesPackage` in `inspirehep.sty` |
 | Licence | `lppl1.3c` |
-| Summary | Live INSPIRE-HEP citation counts, references and plots in LaTeX |
+| Summary | Live INSPIRE-HEP citation counts, references, and plots in LaTeX |
 | Suggested CTAN path | `/macros/latex/contrib/inspirehep` |
 | Topics | `bibtex-supp`, `cv`, `physics` |
 

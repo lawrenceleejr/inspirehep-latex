@@ -50,7 +50,7 @@ _OPT = r"(?:\[[^\]]*\])?"
 # (Lee:2018pag).  The two are told apart by shape, here and in the package.
 _ID = r"(\d+|[A-Za-z][\w.'-]*:\d{4}[A-Za-z0-9]+)"
 TEXKEY_RE = re.compile(r"^[A-Za-z][\w.'-]*:\d{4}[A-Za-z0-9]+$")
-# \input{f}, \include{f} and \subfile{f}, so a multi-file document can be
+# \input{f}, \include{f}, and \subfile{f}, so a multi-file document can be
 # scanned from its root without listing every chapter.
 INPUT_RE = re.compile(r"\\(?:input|include|subfile)\s*\{\s*([^}]+?)\s*\}")
 
@@ -67,7 +67,7 @@ URL_AUTHOR_RE = re.compile(r"inspirehep\.net/authors/(\d+)")
 def day_number(d: datetime.date) -> int:
     """A day count TeX can also compute, as 365*year + 31*month + day.
 
-    inspirehep.sty works out today's value the same way from \\year, \\month and
+    inspirehep.sty works out today's value the same way from \\year, \\month, and
     \\day so the two can be compared without a date library on the TeX side.
     Uneven month lengths make it drift a few units over a quarter, which is
     fine for the package's soft "these figures are getting old" check.
@@ -178,7 +178,7 @@ def query_for(identifier: str) -> str:
 def fetch_records(recids: list[str], style: str = "latex-eu") -> dict[str, dict]:
     """Everything the package can say about each record.
 
-    Counts, titles and keys come from one batched metadata query; the reference
+    Counts, titles, and keys come from one batched metadata query; the reference
     line comes from INSPIRE's own renderer, one call per record.
     """
     if not recids:
@@ -239,7 +239,7 @@ def fetch_bibtex(recid: str) -> str:
 
 
 def fetch_summary(author: str) -> dict[str, int]:
-    """Papers, citations and h-index, from the same aggregation INSPIRE's own
+    """Papers, citations, and h-index, from the same aggregation INSPIRE's own
     profile pages use, so the numbers match what a reader sees there."""
     if author.isdigit():
         profile = api_get(f"authors/{author}", {"fields": "ids"})
@@ -292,7 +292,7 @@ def series(pairs: list[tuple[str, int]]) -> str:
 
 def walk_inputs(roots: list[Path], base: Path | None = None,
                 seen: set[Path] | None = None) -> list[Path]:
-    """Every file reachable from `roots` through \\input, \\include or \\subfile.
+    """Every file reachable from `roots` through \\input, \\include, or \\subfile.
 
     LaTeX resolves \\input relative to the directory the compile was started
     in -- the main document's -- not relative to the file doing the including,

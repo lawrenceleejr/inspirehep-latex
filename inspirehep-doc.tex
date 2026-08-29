@@ -47,7 +47,7 @@
 \setlength{\parskip}{0.55em}
 
 \title{The \pkg{inspirehep} package\\[0.3em]
-  \large Live INSPIRE-HEP citation counts, references and plots}
+  \large Live INSPIRE-HEP citation counts, references, and plots}
 \author{Lawrence Lee\\
   \small\url{https://github.com/lawrenceleejr/inspirehep-latex}}
 \date{Version 2.0\quad 2026/08/29}
@@ -151,7 +151,7 @@ common case it takes no arguments. Neither is needed to \emph{typeset}.
 
 \paragraph{Multi-file documents.}
 Point either fetcher at the main file and it follows \verb|\input|,
-\verb|\include| and \verb|\subfile| from there, however deeply nested:
+\verb|\include|, and \verb|\subfile| from there, however deeply nested:
 
 \begin{code}
 python3 inspirehep-fetch.py main.tex
@@ -395,7 +395,7 @@ output or impact over time:
 \end{demo}
 
 The default style is deliberately spare: one line, axis lines only where they
-carry information, no grid, box, marks or legend. Three hooks change it ---
+carry information, no grid, box, marks, or legend. Three hooks change it ---
 \verb|\inspireplotwidth|, \verb|\inspireplotheight|, and
 \verb|\inspireplotstyle|, which takes any \pkg{pgfplots} axis keys:
 

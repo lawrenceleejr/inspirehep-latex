@@ -208,7 +208,7 @@ Known limits:
 
 - Refreshing needs `python3` (standard library only); the self-fetch
   additionally needs unrestricted shell escape. Neither is needed to typeset.
-- Both fetchers follow `\input`, `\include` and `\subfile` from the main
+- Both fetchers follow `\input`, `\include`, and `\subfile` from the main
   file, resolving names as LaTeX does (relative to the main document) and then
   relative to the including file, as `subfiles` and `import` do. `--no-follow`
   scans only the files named.
