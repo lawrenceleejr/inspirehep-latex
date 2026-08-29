@@ -1,0 +1,50 @@
+%% A minimal CV fragment showing everything inspirehep.sty does.
+%%
+%% Build it two ways:
+%%   pdflatex -shell-escape example.tex   (twice; the package fetches for you)
+%%   python3 ../inspirehep-fetch.py example.tex && pdflatex example.tex
+%%
+%% Either way the second run shows live citation counts.
+
+\documentclass[11pt]{article}
+\usepackage[hidelinks]{hyperref}
+\usepackage[author=1071846]{inspirehep}
+
+% Figures to show before the file has ever been fetched, so the example is
+% never blank or alarming.
+\inspiredefaultstat{papers}{1400}
+\inspiredefaultstat{citations}{200000}
+\inspiredefaultstat{hindex}{200}
+
+% The annotation, set small and grey a level below the titles it describes.
+\usepackage{xcolor}
+\definecolor{citegrey}{gray}{0.40}
+\renewcommand{\inspirecitesformat}[1]{\nobreakspace{\small\color{citegrey}[#1]}}
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+\section*{Publications}
+
+Over \inspirestat{papers} published papers with over \inspirestat{citations}
+citations and an $h$-index of \inspirestat{hindex}, according to
+\href{https://inspirehep.net/authors/1071846}{INSPIRE}.
+
+\medskip
+\begin{enumerate}\itemsep0.4em
+
+  \item \inspirepub{2642414}{Towards a Muon Collider},
+        \emph{Eur. Phys. J. C} 83, 864 \hfill 2023
+
+  \item \inspirepub{1701002}{Collider Searches for Long-Lived Particles Beyond
+        the Standard Model}, \emph{Prog. Part. Nucl. Phys.} 3695 \hfill 2019
+
+  \item A title set by hand, with only the count borrowed:
+        \textit{Light-quark and Gluon Jet Discrimination}\inspirecites{1298030}
+        \hfill 2014
+
+\end{enumerate}
+
+\end{document}

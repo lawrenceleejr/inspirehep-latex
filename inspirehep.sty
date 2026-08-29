@@ -1,0 +1,368 @@
+%%
+%% inspirehep.sty -- live INSPIRE-HEP citation counts in a LaTeX CV.
+%%
+%% Copyright (C) 2026 Lawrence Lee
+%%
+%% This work may be distributed and/or modified under the conditions of the
+%% LaTeX Project Public License, either version 1.3c of this license or (at
+%% your option) any later version.  The latest version of this license is in
+%%     https://www.latex-project.org/lppl.txt
+%% This work has the LPPL maintenance status `maintained'.
+%% The Current Maintainer of this work is Lawrence Lee.
+%%
+%% https://github.com/lawrenceleejr/inspirehep-latex
+%%
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{inspirehep}[2026/08/29 v1.0
+  Live INSPIRE-HEP citation counts in a LaTeX CV]
+
+\RequirePackage{kvoptions}
+
+\SetupKeyvalOptions{family=inspirehep, prefix=inspirehep@}
+\DeclareStringOption[]{author}          % INSPIRE author recid or BAI
+\DeclareStringOption[inspirehep-data]{data}  % basename of the generated file
+\DeclareStringOption[120]{maxage}       % days before the figures are called old
+\DeclareStringOption[1]{mincites}       % counts below this print nothing
+\DeclareStringOption[auto]{fetch}       % auto | on | off
+\ProcessKeyvalOptions*
+
+\ExplSyntaxOn
+
+%% ===========================================================================
+%% Options
+%% ===========================================================================
+%% kvoptions stores its values in \inspirehep@author and friends, whose @ stops
+%% being a letter the moment \ExplSyntaxOn is in force -- so they are reachable
+%% only through \use:c, and are copied once into proper expl3 variables here
+%% rather than spelled that way at every use.
+
+\tl_const:Nx   \c_inspirehep_author_tl    { \use:c { inspirehep@author   } }
+\tl_const:Nx   \c_inspirehep_data_tl      { \use:c { inspirehep@data     } }
+\tl_const:Nx   \c_inspirehep_fetch_tl     { \use:c { inspirehep@fetch    } }
+\int_const:Nn  \c_inspirehep_maxage_int   { \use:c { inspirehep@maxage   } }
+\int_const:Nn  \c_inspirehep_mincites_int { \use:c { inspirehep@mincites } }
+
+%% ===========================================================================
+%% Stored data
+%% ===========================================================================
+%% Both fetchers -- this package via shell escape, and the Python helper --
+%% write the same three declarations into <data>.tex, so the file is
+%% interchangeable between them.
+%%
+%%   \inspiresetcites{<record>}{<count>}
+%%   \inspiresetstat{<key>}{<value>}
+%%   \inspiresetfetched{<iso date>}{<day number>}
+
+\prop_new:N \g_inspirehep_cites_prop
+\prop_new:N \g_inspirehep_stat_prop
+\seq_new:N  \g_inspirehep_wanted_seq      % records this document asks about
+\bool_new:N \g_inspirehep_missing_bool    % ... at least one of which is unknown
+\tl_new:N   \g_inspirehep_fetched_tl
+\int_new:N  \g_inspirehep_fetchedday_int
+
+\NewDocumentCommand \inspiresetcites { m m }
+  { \prop_gput:Nnn \g_inspirehep_cites_prop {#1} {#2} }
+\NewDocumentCommand \inspiresetstat { m m }
+  { \prop_gput:Nnn \g_inspirehep_stat_prop {#1} {#2} }
+\NewDocumentCommand \inspiresetfetched { m m }
+  { \tl_gset:Nn \g_inspirehep_fetched_tl {#1} \int_gset:Nn \g_inspirehep_fetchedday_int {#2} }
+
+% \inspiredefaultstat{<key>}{<value>} -- a fallback used only when the fetched
+% data does not supply the key.  Put these after \usepackage so the document
+% still says something sensible before it has ever been fetched.
+\NewDocumentCommand \inspiredefaultstat { m m }
+  { \prop_get:NnNTF \g_inspirehep_stat_prop {#1} \l_tmpa_tl { } { \inspiresetstat {#1} {#2} } }
+
+%% ===========================================================================
+%% Typesetting
+%% ===========================================================================
+%% Each of these is meant to be redefined by the document.
+
+% \inspiretitleformat{<title>} -- how a publication title is set.
+\providecommand \inspiretitleformat [1] { \textbf {#1} }
+% \inspirecitestext{<n>} -- the words.  Redefine for another language.
+\providecommand \inspirecitestext [1]
+  { #1 \nobreakspace \ifnum #1 = 1 citation \else citations \fi }
+% \inspirecitesformat{<text>} -- how the annotation is attached.
+\providecommand \inspirecitesformat [1] { \nobreakspace { \small [#1] } }
+
+% Link through hyperref when the document has it, plain text otherwise, decided
+% at \begin{document} so load order does not matter.
+\cs_new:Npn \inspirehep_link:nn #1#2 { #2 }
+\AddToHook { begindocument }
+  {
+    \cs_if_exist:NT \href
+      { \cs_gset:Npn \inspirehep_link:nn #1#2 { \href {#1} {#2} } }
+  }
+
+\cs_new:Npn \inspirehep_record_url:n #1 { https://inspirehep.net/literature/#1 }
+
+%% \inspirecites{<record>} -- the citation annotation for one record, or
+%% nothing when the count is unknown or below the mincites threshold.
+\NewDocumentCommand \inspirecites { m }
+  {
+    \seq_if_in:NnF \g_inspirehep_wanted_seq {#1}
+      { \seq_gput_right:Nn \g_inspirehep_wanted_seq {#1} }
+    \prop_get:NnNTF \g_inspirehep_cites_prop {#1} \l_tmpa_tl
+      {
+        \int_compare:nNnT { \l_tmpa_tl } > { \c_inspirehep_mincites_int - 1 }
+          { \inspirecitesformat { \inspirecitestext { \tl_use:N \l_tmpa_tl } } }
+      }
+      { \bool_gset_true:N \g_inspirehep_missing_bool }
+  }
+
+%% \inspirepub{<record>}{<title>} -- the title, linked to its INSPIRE record
+%% and followed by that record's citation count.
+\NewDocumentCommand \inspirepub { m m }
+  {
+    \inspirehep_link:nn { \inspirehep_record_url:n {#1} } { \inspiretitleformat {#2} }
+    \inspirecites {#1}
+  }
+
+%% \inspirestat{<key>} -- an author-level figure: papers, citations or hindex.
+%% An unknown key is loud rather than silently blank.
+\NewDocumentCommand \inspirestat { m }
+  {
+    \prop_get:NnNTF \g_inspirehep_stat_prop {#1} \l_tmpa_tl
+      { \tl_use:N \l_tmpa_tl }
+      { \textbf { [?~#1] } }
+  }
+
+\ExplSyntaxOff
+
+\ExplSyntaxOn
+
+%% ===========================================================================
+%% Fetching
+%% ===========================================================================
+%% The package can refresh the figures itself, with curl, through TeX's shell
+%% escape.  That needs pdflatex -shell-escape, which is off by default and is
+%% not available on Overleaf, so it is strictly an optimisation: the figures
+%% always come from <data>.tex, and fetching is only how that file gets
+%% written.  tools/inspirehep-fetch.py writes the identical file for anyone who
+%% cannot, or would rather not, enable shell escape.
+%%
+%% Fetching happens at the END of the run, once the document has told us every
+%% record it cares about, and only when there is a reason: no data file yet, a
+%% record with no entry (a publication you just added), or figures older than
+%% `maxage`.  The numbers then appear on the next compile, exactly like a
+%% cross-reference.
+
+\bool_new:N \g_inspirehep_stale_bool
+\bool_new:N \g_inspirehep_canfetch_bool
+\tl_new:N   \l_inspirehep_json_tl
+\seq_new:N  \l_inspirehep_hits_seq
+\seq_new:N  \l_inspirehep_recids_seq
+\seq_new:N  \l_inspirehep_counts_seq
+\iow_new:N  \g_inspirehep_iow
+
+\cs_new:Npn \inspirehep_pad:n #1 { \int_compare:nNnT {#1} < { 10 } { 0 } \int_eval:n {#1} }
+\cs_new:Npn \inspirehep_dayno: { \int_eval:n { 365*\c_sys_year_int + 31*\c_sys_month_int + \c_sys_day_int } }
+\cs_new:Npn \inspirehep_datafile: { \c_inspirehep_data_tl .tex }
+
+% Fetching is possible only with unrestricted shell escape.  `fetch=off` opts
+% out entirely; `fetch=on` asks for it and complains when it cannot happen.
+\bool_gset_false:N \g_inspirehep_canfetch_bool
+\str_case:VnF \c_inspirehep_fetch_tl
+  {
+    { off } { }
+    { on }
+      {
+        \sys_if_shell_unrestricted:TF
+          { \bool_gset_true:N \g_inspirehep_canfetch_bool }
+          { \PackageWarningNoLine { inspirehep }
+              { fetch=on~but~unrestricted~shell~escape~is~off. \MessageBreak
+                Compile~with~-shell-escape,~or~run~inspirehep-fetch.py,~or~set~fetch=off } }
+      }
+    { auto }
+      { \sys_if_shell_unrestricted:T { \bool_gset_true:N \g_inspirehep_canfetch_bool } }
+  }
+  { \PackageWarningNoLine { inspirehep } { unknown~fetch=\c_inspirehep_fetch_tl;~use~auto,~on~or~off } }
+
+%% Read whatever we already have, and judge its age.
+\AddToHook { begindocument }
+  {
+    \file_if_exist:nTF { \inspirehep_datafile: }
+      { \file_input:n { \inspirehep_datafile: } }
+      { \bool_gset_true:N \g_inspirehep_stale_bool }
+    \int_compare:nNnT { \g_inspirehep_fetchedday_int } > { 0 }
+      {
+        \int_compare:nNnT
+          { \inspirehep_dayno: - \g_inspirehep_fetchedday_int } > { \c_inspirehep_maxage_int }
+          {
+            \bool_gset_true:N \g_inspirehep_stale_bool
+            \bool_if:NF \g_inspirehep_canfetch_bool
+              { \PackageWarningNoLine { inspirehep }
+                  { The~figures~date~from~\g_inspirehep_fetched_tl\space (about~
+                    \int_eval:n { \inspirehep_dayno: - \g_inspirehep_fetchedday_int }~days~ago).
+                    \MessageBreak Refresh~them~with~-shell-escape~or~inspirehep-fetch.py } }
+          }
+      }
+  }
+
+%% curl, driven from TeX.  Two traps are load-bearing here: a `%` anywhere in
+%% the command is a TeX comment, so the query goes through --data-urlencode
+%% rather than a query string; and a `~` opening a continuation line is
+%% swallowed, running arguments together, so every line ends with one instead.
+\cs_new_protected:Npn \inspirehep_curl:nn #1#2
+  { \sys_shell_now:x { curl~-sS~-m~60~-G~#1~#2 } }
+
+%% INSPIRE's author search takes a BAI ("J.Smith.1"), not the record number in
+%% a profile URL -- asking it for "a 1071846" matches nothing and quietly yields
+%% a summary of zeroes.  So a numeric author is resolved to its BAI first, which
+%% is what the profile URL gives you and therefore what people will paste.
+\tl_new:N \l_inspirehep_bai_tl
+
+\cs_new_protected:Npn \inspirehep_resolve_author:
+  {
+    \tl_set_eq:NN \l_inspirehep_bai_tl \c_inspirehep_author_tl
+    \regex_match:nVT { \A \d+ \Z } \c_inspirehep_author_tl
+      {
+        \inspirehep_curl:nn
+          { https://inspirehep.net/api/authors/\c_inspirehep_author_tl }
+          { --data-urlencode~"fields=ids"~-o~\c_inspirehep_data_tl -author.json }
+        \inspirehep_read_json:n { \c_inspirehep_data_tl -author.json }
+        \inspirehep_grab:nnN { "value":"([^"]+)","schema":"INSPIRE\ BAI" } {} \l_tmpa_tl
+        \tl_if_empty:NTF \l_tmpa_tl
+          { \PackageWarningNoLine { inspirehep }
+              { could~not~resolve~author~\c_inspirehep_author_tl\space to~a~BAI;~
+                summary~figures~skipped } }
+          { \tl_set_eq:NN \l_inspirehep_bai_tl \l_tmpa_tl }
+      }
+  }
+
+\cs_new_protected:Npn \inspirehep_fetch_summary:
+  {
+    \tl_if_empty:NF \c_inspirehep_author_tl
+      {
+        \inspirehep_resolve_author:
+        \tl_if_empty:NF \l_inspirehep_bai_tl
+          {
+            \inspirehep_curl:nn
+              { https://inspirehep.net/api/literature/facets }
+              { --data-urlencode~"q=a~\l_inspirehep_bai_tl"~%
+                --data-urlencode~"facet_name=citation-summary"~%
+                -o~\c_inspirehep_data_tl -summary.json }
+          }
+      }
+  }
+
+\cs_new_protected:Npn \inspirehep_fetch_records:
+  {
+    \seq_if_empty:NF \g_inspirehep_wanted_seq
+      {
+        \inspirehep_curl:nn
+          { https://inspirehep.net/api/literature }
+          { --data-urlencode~"q=recid~\seq_use:Nn \g_inspirehep_wanted_seq {~or~recid~}"~%
+            --data-urlencode~"fields=control_number,citation_count"~%
+            --data-urlencode~"size=250"~%
+            -o~\c_inspirehep_data_tl -records.json }
+      }
+  }
+
+%% The JSON is read with every catcode forced to `other'.  Without that the %,
+%% & and _ in an INSPIRE response are read as comment, alignment and subscript,
+%% and no pattern ever matches.
+\cs_new_protected:Npn \inspirehep_read_json:n #1
+  { \file_get:nnNTF {#1} { \cctab_select:N \c_other_cctab } \l_inspirehep_json_tl { } { \tl_clear:N \l_inspirehep_json_tl } }
+
+\cs_new_protected:Npn \inspirehep_write_stat:nn #1#2
+  { \iow_now:Nx \g_inspirehep_iow { \exp_not:N \inspiresetstat {#1} {#2} } }
+
+\cs_new_protected:Npn \inspirehep_grab:nnN #1#2#3
+  {
+    \regex_extract_once:nVNTF {#1} \l_inspirehep_json_tl \l_inspirehep_hits_seq
+      { \tl_set:Nx #3 { \seq_item:Nn \l_inspirehep_hits_seq {2} } }
+      { \tl_clear:N #3 }
+  }
+\ExplSyntaxOff
+
+\ExplSyntaxOn
+%% At the end of the run: fetch if there is a reason to, write <data>.tex, and
+%% ask for a rerun so the new numbers actually appear.
+%% \inspirehep_numbers:nN {<json key>} <seq> -- every integer value that the
+%% key takes in the JSON, in document order.  l3regex's extract_all returns
+%% whole matches rather than submatches, so the key is stripped afterwards.
+\cs_new_protected:Npn \inspirehep_numbers:nN #1#2
+  {
+    \seq_clear:N #2
+    \regex_extract_all:nVN { "#1":\d+ } \l_inspirehep_json_tl \l_inspirehep_hits_seq
+    % The trailing digits are taken with a second regex rather than by stripping
+    % the key as a literal: the JSON is read with every catcode set to `other',
+    % while a `:' written here is a letter under \ExplSyntaxOn, so the two never
+    % compare equal.  Matching on the token list avoids the question.
+    \seq_map_inline:Nn \l_inspirehep_hits_seq
+      {
+        \regex_extract_once:nnNT { \d+ \Z } {##1} \l_tmpb_seq
+          { \seq_put_right:Nx #2 { \seq_item:Nn \l_tmpb_seq { 1 } } }
+      }
+  }
+
+\cs_new_protected:Npn \inspirehep_refresh:
+  {
+    \PackageInfo { inspirehep } { refreshing~the~figures~from~inspirehep.net }
+    \inspirehep_fetch_summary:
+    \inspirehep_fetch_records:
+    \iow_open:Nn \g_inspirehep_iow { \inspirehep_datafile: }
+    \iow_now:Nx \g_inspirehep_iow
+      { \c_percent_str \c_percent_str \c_space_tl GENERATED~by~inspirehep.sty~--~do~not~edit. }
+
+    % Author-level summary.
+    \inspirehep_read_json:n { \c_inspirehep_data_tl -summary.json }
+    \inspirehep_grab:nnN { "total":\{"value":(\d+) } {} \l_tmpb_tl
+    \bool_lazy_and:nnT
+      { ! \tl_if_empty_p:N \l_inspirehep_json_tl }
+      { \int_compare_p:nNn { 0 \l_tmpb_tl } > { 0 } }
+      {
+        \inspirehep_grab:nnN { "h-index":\{"value":\{"all":(\d+) } {} \l_tmpa_tl
+        \tl_if_empty:NF \l_tmpa_tl { \inspirehep_write_stat:nn { hindex } { \l_tmpa_tl } }
+        \inspirehep_grab:nnN { "citations_count":\{"value":(\d+) } {} \l_tmpa_tl
+        \tl_if_empty:NF \l_tmpa_tl { \inspirehep_write_stat:nn { citations } { \l_tmpa_tl } }
+        \inspirehep_grab:nnN { "total":\{"value":(\d+) } {} \l_tmpa_tl
+        \tl_if_empty:NF \l_tmpa_tl { \inspirehep_write_stat:nn { papers } { \l_tmpa_tl } }
+      }
+
+    % Per-record counts.  Every hit carries exactly one control_number and one
+    % citation_count, so the two lists line up; their order inside a hit is not
+    % relied on.  A mismatched length means the response was not what we expect,
+    % and nothing is written rather than something wrong.
+    \inspirehep_read_json:n { \c_inspirehep_data_tl -records.json }
+    \tl_if_empty:NF \l_inspirehep_json_tl
+      {
+        \inspirehep_numbers:nN { control_number } \l_inspirehep_recids_seq
+        \inspirehep_numbers:nN { citation_count } \l_inspirehep_counts_seq
+        \int_compare:nNnTF
+          { \seq_count:N \l_inspirehep_recids_seq } = { \seq_count:N \l_inspirehep_counts_seq }
+          {
+            \int_step_inline:nn { \seq_count:N \l_inspirehep_recids_seq }
+              {
+                \iow_now:Nx \g_inspirehep_iow
+                  { \exp_not:N \inspiresetcites
+                    { \seq_item:Nn \l_inspirehep_recids_seq {##1} }
+                    { \seq_item:Nn \l_inspirehep_counts_seq {##1} } }
+              }
+          }
+          { \PackageWarningNoLine { inspirehep }
+              { the~record~response~did~not~pair~up;~per-paper~counts~not~written } }
+      }
+
+    \iow_now:Nx \g_inspirehep_iow
+      { \exp_not:N \inspiresetfetched
+        { \int_use:N \c_sys_year_int - \inspirehep_pad:n { \c_sys_month_int } - \inspirehep_pad:n { \c_sys_day_int } }
+        { \inspirehep_dayno: } }
+    \iow_close:N \g_inspirehep_iow
+    \PackageWarningNoLine { inspirehep }
+      { The~figures~were~refreshed.~Rerun~LaTeX~to~pick~them~up }
+  }
+
+%% Fetch at the end of the run, once every record the document wants is known,
+%% and only when there is a reason to.
+\AddToHook { enddocument / afterlastpage }
+  {
+    \bool_lazy_and:nnT
+      { \g_inspirehep_canfetch_bool }
+      { \bool_lazy_or_p:nn { \g_inspirehep_stale_bool } { \g_inspirehep_missing_bool } }
+      { \inspirehep_refresh: }
+  }
+\ExplSyntaxOff
+\endinput

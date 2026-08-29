@@ -1,0 +1,70 @@
+name: Build the example
+
+# Two jobs on purpose: the package has two ways to get its numbers, and both
+# are worth exercising.  Between them they also prove the claim the README
+# makes -- that the document compiles either way.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 7 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.how }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - how: package fetches itself (shell escape)
+            fetch: latex
+          - how: python helper, then a plain compile
+            fetch: python
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install TeX Live
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            texlive-latex-base texlive-latex-recommended texlive-latex-extra \
+            texlive-fonts-recommended poppler-utils
+
+      - name: Build
+        working-directory: example
+        run: |
+          set -e
+          cp ../inspirehep.sty .
+          if [ "${{ matrix.fetch }}" = latex ]; then
+            pdflatex -shell-escape -interaction=nonstopmode example.tex
+            pdflatex -shell-escape -interaction=nonstopmode example.tex
+          else
+            python3 ../inspirehep-fetch.py example.tex
+            pdflatex -interaction=nonstopmode example.tex
+          fi
+
+      - name: The numbers must actually be there
+        working-directory: example
+        run: |
+          echo '--- generated data ---'; cat inspirehep-data.tex
+          pdftotext example.pdf - > out.txt
+          grep -qE '\[[0-9]+ citations?\]' out.txt \
+            || { echo 'no citation annotation in the output'; cat out.txt; exit 1; }
+          grep -q 'h-index of [0-9]' out.txt \
+            || { echo 'no author-level figure in the output'; cat out.txt; exit 1; }
+          echo 'OK'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: example-${{ matrix.fetch }}
+          path: example/example.pdf
+          if-no-files-found: error
