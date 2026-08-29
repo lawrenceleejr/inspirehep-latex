@@ -3,25 +3,27 @@
 Live [INSPIRE-HEP](https://inspirehep.net) citation counts in a LaTeX CV.
 
 ```latex
-\usepackage[author=1071846]{inspirehep}
+\usepackage{inspirehep}
 ...
-\inspirepub{2642414}{Towards a Muon Collider}, \emph{Eur. Phys. J. C} 83, 864
+\inspirepub{2642414}
 ```
 
 > Towards a Muon Collider [407 citations], *Eur. Phys. J. C* 83, 864
 
-and, for the summary line people put at the top of a publication list:
+Hand it an id; it fetches the title. And for the summary line at the top of a
+publication list:
 
 ```latex
-Over \inspirestatround{papers}{100} papers with over
-\inspirestatround{citations}{1000} citations and an
-$h$-index of \inspirestat{hindex}.
+Over \inspirepapers[round=100]{1071846} papers with over
+\inspirecitations[round=1000]{1071846} citations and an
+$h$-index of \inspirehindex{1071846}.
 ```
 
 > Over 1,400 papers with over 207,000 citations and an *h*-index of 211.
 
-`\inspirestatround` rounds **down**, so a claim of "over N" stays true as the
-real figure grows.
+`round=` rounds **down**, so a claim of "over N" stays true as the real figure
+grows. Author commands take the id they are asking about rather than a package
+option, so one document can discuss several people.
 
 The numbers live in a generated file, so **the document always compiles** —
 offline, on a stranger's machine, on Overleaf — whether or not it can reach the
@@ -81,39 +83,90 @@ already degrades to exactly the same behaviour.
 
 ## Commands
 
+**Records.** The id is the number in the INSPIRE URL,
+`inspirehep.net/literature/`**`2642414`**.
+
 | Command | Result |
 | --- | --- |
-| `\inspirepub{<record>}{<title>}` | the title, linked to its INSPIRE record, followed by the citation count |
-| `\inspirecites{<record>}` | just the count, for a title you want to set yourself |
-| `\inspirestat{papers\|citations\|hindex}` | an author-level figure |
-| `\inspirestatround{<key>}{<step>}` | the same, rounded **down** to a multiple of `<step>` and digit-grouped: `\inspirestatround{citations}{1000}` gives `207,000` |
-| `\inspiredefaultstat{<key>}{<value>}` | a fallback used only until the figures have been fetched once |
+| `\inspirepub[<opts>]{<id>}` | the entry: title (fetched), linked, with its citation count |
+| `\inspiretitle{<id>}` | the title alone |
+| `\inspireref[<opts>]{<id>}` | the full reference, exactly as INSPIRE formats it |
+| `\inspirecites{<id>}` | the citation count alone |
+| `\inspireyear{<id>}` | the publication year |
+| `\inspirekey{<id>}` | the BibTeX key |
+| `\inspirecite{<id>}` | `\cite` with that key |
+| `\inspireplot[<opts>]{<id>}` | citations per year, as a line |
 
-The record number is the one in the INSPIRE URL:
-`inspirehep.net/literature/`**`2642414`**.
+`\inspirepub` takes options for exactly what it shows:
+
+```latex
+\inspirepub{2642414}                    % title + count
+\inspirepub[year]{2642414}              % ... and the year
+\inspirepub[ref]{2642414}               % the full reference instead of the title
+\inspirepub[cites=false]{2642414}       % no count
+\inspirepub[link=false]{2642414}        % no hyperlink
+\inspirepub[title={My own words}]{2642414}   % your title, INSPIRE's count
+```
+
+**People.** The id is the number in a profile URL,
+`inspirehep.net/authors/`**`1071846`**, or a BAI such as `J.Smith.1`.
+
+| Command | Result |
+| --- | --- |
+| `\inspirepapers[<opts>]{<id>}` | publication count |
+| `\inspirecitations[<opts>]{<id>}` | citation count |
+| `\inspirehindex[<opts>]{<id>}` | *h*-index |
+| `\inspireauthorstat[<opts>]{<id>}{<key>}` | any of the three by name |
+| `\inspireauthorplot[<opts>]{<id>}{papers\|citations}` | that quantity per year, as a line |
+
+All take `round=<n>` to round **down** to a multiple of `n`.
+
+**BibTeX.** `\inspirecite{<id>}` cites by INSPIRE id: the fetcher writes
+`inspirehep-refs.bib` containing INSPIRE's own BibTeX entries for every record
+you cite, and `\inspirecite` expands to `\cite{}` with the right key. You never
+handle a BibTeX key yourself.
+
+```latex
+\bibliography{inspirehep-refs}
+... as shown in \inspirecite{1701002}.
+```
 
 ## Options
 
+Every option is both a package option and a per-call option, so a document sets
+house style once and any one entry can depart from it.
+
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `author` | *(none)* | your INSPIRE author recid or BAI, for `\inspirestat`. Omit it and only per-paper counts work. |
-| `fetch` | `auto` | `auto` fetches when shell escape allows, `on` demands it and warns when it is unavailable, `off` never fetches |
+| `cites` | `true` | show the citation count |
+| `ref` | `false` | show the full reference instead of the title |
+| `year` | `false` | append the publication year |
+| `link` | `true` | hyperlink the title |
+| `title` | *(none)* | override the fetched title |
+| `round` | `1` | round a figure down to a multiple of this |
+| `sep` | `comma` | thousands separator: `comma`, `period`, `space`, `thin`, `underscore`, `none`, or `sepstring={...}` for anything else |
+| `style` | `latex-eu` | INSPIRE reference format: `latex-eu` or `latex-us` |
+| `plots` | `false` | load pgfplots, needed for the plotting commands |
 | `data` | `inspirehep-data` | basename of the generated file |
-| `maxage` | `120` | days before the figures are called stale; `0` never warns |
-| `mincites` | `1` | counts below this print nothing, so a brand-new paper is left unannotated rather than advertising a zero |
+| `bib` | `inspirehep-refs` | basename of the generated `.bib` |
+| `maxage` | `120` | days before the data is called stale; `0` never warns |
+| `mincites` | `1` | counts below this print nothing |
+| `fetch` | `auto` | `auto`, `on`, or `off` |
 
-Your author id is the number in your INSPIRE profile URL,
-`inspirehep.net/authors/`**`1071846`**, or your BAI (`J.Smith.1`).
+`\inspiresetup{<options>}` changes any of them mid-document.
 
 ## Changing how it looks
 
 Three hooks, each redefinable:
 
 ```latex
-\renewcommand{\inspiretitleformat}[1]{\textbf{#1}}          % the title
-\renewcommand{\inspirecitestext}[1]{#1~cites}               % the words
+\renewcommand{\inspiretitleformat}[1]{\textbf{#1}}               % the title
+\renewcommand{\inspirecitestext}[1]{#1~cites}                    % the words
 \renewcommand{\inspirecitesformat}[1]{\nobreakspace{\small[#1]}}  % the wrapper
-\renewcommand{\inspirenumsep}{\,}                           % digit grouping
+\renewcommand{\inspireyearformat}[1]{\hfill #1}                  % the year
+\renewcommand{\inspireplotstyle}{ymajorgrids, blue}              % plot axis keys
+\renewcommand{\inspireplotwidth}{10cm}
+\renewcommand{\inspireplotheight}{3cm}
 ```
 
 To set the annotation in a muted grey, for instance:
