@@ -13,3 +13,4 @@ __pycache__/
 inspirehep.pdf
 inspirehep.zip
 ctan/
+*.vrb

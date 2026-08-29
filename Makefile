@@ -7,6 +7,7 @@ VERSION = 2.0
 doc: $(PKG).pdf
 
 $(PKG).pdf: $(PKG)-doc.tex $(PKG).sty
+	-python3 $(PKG)-fetch.py $(PKG)-doc.tex --output $(PKG)-doc-data.tex
 	pdflatex -interaction=nonstopmode $(PKG)-doc.tex
 	pdflatex -interaction=nonstopmode $(PKG)-doc.tex
 	mv $(PKG)-doc.pdf $(PKG).pdf
@@ -26,13 +27,13 @@ test: example
 ctan: doc
 	rm -rf ctan/$(PKG) $(PKG).zip
 	mkdir -p ctan/$(PKG)/example
-	cp $(PKG).sty $(PKG)-doc.tex $(PKG).pdf $(PKG)-fetch.py \
+	cp $(PKG).sty $(PKG)-doc.tex $(PKG)-doc-data.tex $(PKG).pdf $(PKG)-fetch.py \
 	   README.md LICENSE ctan/$(PKG)/
-	cp example/example.tex ctan/$(PKG)/example/
+	cp example/example.tex example/inspirehep-data.tex ctan/$(PKG)/example/
 	cd ctan && zip -qr ../$(PKG).zip $(PKG)
 	@echo "wrote $(PKG).zip"
 
 clean:
-	rm -f *.aux *.log *.out *.toc $(PKG)-doc.pdf
+	rm -f *.aux *.log *.out *.toc *.vrb $(PKG)-doc.pdf
 	rm -rf ctan
 	cd example && rm -f *.aux *.log *.out *.pdf $(PKG).sty *.json

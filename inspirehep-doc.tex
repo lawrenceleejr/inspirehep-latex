@@ -1,150 +1,503 @@
 %% Manual for inspirehep.sty.  Build with:  make doc
+%%
+%% Every example is executed as it is shown: each demo is written to a file by
+%% fancyvrb's VerbatimOut, then both \VerbatimInput (what you see) and \input
+%% (what runs).  The output printed under an example therefore cannot drift
+%% from the code above it.  The data is pinned in inspirehep-doc-data.tex,
+%% which `make doc' refreshes.
 \documentclass[a4paper,11pt]{article}
 \usepackage[T1]{fontenc}
-\usepackage[margin=1in]{geometry}
+\usepackage[margin=1.1in]{geometry}
 \usepackage[hidelinks]{hyperref}
 \usepackage{booktabs}
 \usepackage{fancyvrb}
-\usepackage{inspirehep}
+\usepackage{xcolor}
+\usepackage[plots, data=inspirehep-doc-data, fetch=off]{inspirehep}
 
-% \BibTeX is not in the kernel; define it rather than depend on a package.
-\providecommand{\BibTeX}{B\textsc{ib}\TeX}
+%% ---------------------------------------------------------------------------
+%% Demo machinery
+\definecolor{demoframe}{gray}{0.72}
+\definecolor{demoground}{gray}{0.97}
+% The whole pair -- code and its output -- is boxed together so a page break
+% can never separate what you write from what you get.
+\newenvironment{demo}
+  {\VerbatimEnvironment\begin{VerbatimOut}{\jobname-demo.vrb}}
+  {\end{VerbatimOut}\par\medskip\noindent
+   \begin{minipage}{\linewidth}
+   \VerbatimInput[frame=single, rulecolor=\color{demoframe}, fontsize=\small,
+     label={\normalfont\scriptsize\textcolor{black!55}{you write}}]{\jobname-demo.vrb}%
+   \vspace{-0.9\baselineskip}\noindent
+   {\setlength{\fboxsep}{7pt}\setlength{\fboxrule}{0.4pt}%
+    \fcolorbox{demoframe}{demoground}{%
+      \begin{minipage}{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}
+        {\scriptsize\textcolor{black!55}{you get}\par\smallskip}%
+        \input{\jobname-demo.vrb}
+      \end{minipage}}}%
+   \end{minipage}\medskip\par}
+\DefineVerbatimEnvironment{code}{Verbatim}
+  {frame=single, rulecolor=\color{demoframe}, fontsize=\small}
+
 \newcommand{\pkg}[1]{\textsf{#1}}
 \newcommand{\opt}[1]{\texttt{#1}}
+\providecommand{\BibTeX}{B\textsc{ib}\TeX}
+\ExplSyntaxOn
+\NewDocumentCommand \datadate {} { \tl_use:N \g_inspirehep_fetched_tl }
+\ExplSyntaxOff
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{0.6em}
+\setlength{\parskip}{0.55em}
 
 \title{The \pkg{inspirehep} package\\[0.3em]
-  \large Live INSPIRE-HEP data in a \LaTeX{} document}
-\author{Lawrence Lee}
-\date{Version 2.0 \quad 2026/08/29}
+  \large Live INSPIRE-HEP citation counts, references and plots}
+\author{Lawrence Lee\\
+  \small\url{https://github.com/lawrenceleejr/inspirehep-latex}}
+\date{Version 2.0\quad 2026/08/29}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
 \noindent
-\pkg{inspirehep} puts data from \href{https://inspirehep.net}{INSPIRE-HEP} into
-a \LaTeX{} document: hand a command a record id and it typesets the title, the
-citation count, the full reference or the \BibTeX{} entry; hand it a person's id
-and it gives their publication count, citation count or $h$-index, or a plot of
-either against time. The numbers live in a generated file, so the document
-always compiles --- offline, on a stranger's machine, on Overleaf --- whether or
-not it can reach the network.
+\pkg{inspirehep} puts live data from \href{https://inspirehep.net}{INSPIRE-HEP}
+into a \LaTeX{} document. Hand a command a paper's id and it typesets the
+title, the citation count, the full reference, or a plot of its citations over
+time; hand it a person's id and it gives their paper count, citation count,
+$h$-index, or either as a plot. The numbers live in a generated file, so the
+document itself always compiles --- offline, on a stranger's machine, on
+Overleaf.
+
+\smallskip
+Every example below is executed exactly as shown; the grey panels are this
+manual's real output, from data fetched on \datadate.
 \end{abstract}
 
-\section{Installation}
-Put \texttt{inspirehep.sty} where \LaTeX{} will find it: beside your document,
-or anywhere on \texttt{TEXINPUTS}. It requires only \pkg{xparse} and
-\pkg{l3keys2e}, both part of a current \LaTeX{}; \pkg{pgfplots} is needed only
-if you plot, and is loaded only if you ask for it with the \opt{plots} option.
+\section{Quick start}
 
-\section{Getting the data}
-The figures are read from \texttt{inspirehep-data.tex}. Two things can write
-it, and they write the same file.
+Put \texttt{inspirehep.sty} next to your document (or anywhere on
+\texttt{TEXINPUTS}) and write:
 
-\textbf{The package itself.} With unrestricted shell escape it refreshes at the
-end of a run and asks for a rerun, exactly like a cross-reference:
-\begin{Verbatim}[frame=single,fontsize=\small]
-pdflatex -shell-escape cv.tex
-pdflatex -shell-escape cv.tex
-\end{Verbatim}
-After that it only refetches when there is a reason: a record you have just
-added, or data older than \opt{maxage}.
+\begin{code}
+\documentclass{article}
+\usepackage[hidelinks]{hyperref}
+\usepackage{inspirehep}
+\begin{document}
+Our review \inspirepub{1701002} has aged well.
 
-\textbf{Or the helper.} \texttt{inspirehep-fetch.py} does the same job from
-outside the compile, needs only the Python standard library, and reads your
-sources to work out what to ask for:
-\begin{Verbatim}[frame=single,fontsize=\small]
+I have written \inspirepapers{1071846} papers, cited
+\inspirecitations[round=1000]{1071846} times.
+\end{document}
+\end{code}
+
+Then either compile with shell escape and let the package fetch for itself,
+
+\begin{code}
+pdflatex -shell-escape cv.tex    % fetches, writes inspirehep-data.tex
+pdflatex -shell-escape cv.tex    % the numbers appear
+\end{code}
+
+or run the bundled helper once and compile normally:
+
+\begin{code}
 python3 inspirehep-fetch.py cv.tex
-\end{Verbatim}
+pdflatex cv.tex
+\end{code}
 
-\subsection{Overleaf}
-Overleaf disables shell escape and its compile containers have no network, so
-nothing can fetch there --- but a document still typesets correct figures,
-because they are only an \verb|\input| file. Upload \texttt{inspirehep.sty},
-then add \texttt{inspirehep-data.tex} through \emph{Add file $\to$ From external
-URL}, pointing at the raw copy in your repository. Overleaf gives linked files
-a \emph{Refresh} button, so new figures are one click away. Note that Overleaf's
-Git sync does not fetch submodules: include the \texttt{.sty} as a file.
+Either way the body renders as:
 
-\section{Records}
-\begin{Verbatim}[frame=single,fontsize=\small]
-\inspirepub{2642414}                  \inspirekey{2642414}
-\inspirepub[year]{2642414}            \inspirecite{2642414}
-\inspirepub[ref]{2642414}             \inspiretitle{2642414}
-\inspirepub[cites=false]{2642414}     \inspirecites{2642414}
-\inspirepub[title={My words}]{2642414}  \inspireref{2642414}
-\end{Verbatim}
-The id is the number in the INSPIRE URL,
-\texttt{inspirehep.net/literature/\textbf{2642414}}.
+\begin{demo}
+Our review \inspirepub{1701002} has aged well.
 
-References and \BibTeX{} come from INSPIRE's own renderers rather than being
-assembled from the metadata, so they match what everyone else in the field
-cites, errata included.
+I have written \inspirepapers{1071846} papers, cited
+\inspirecitations[round=1000]{1071846} times.
+\end{demo}
+
+Two passes the first time, exactly like a cross-reference. After that the
+package only refetches when there is a reason: a record you have just added,
+or data older than \opt{maxage} days.
+
+\section{Where the numbers come from}
+
+Both fetchers write the same generated file, \texttt{inspirehep-data.tex}: a
+flat list of declarations the package reads at \verb|\begin{document}|.
+
+\begin{code}
+%% GENERATED by inspirehep-fetch.py -- do not edit.
+\inspiresetcites{1701002}{245}
+\inspiresettitle{1701002}{Collider Searches for Long-Lived ...}
+\inspiresetkey{1701002}{Lee:2018pag}
+\inspiresetref{1701002}{L.~Lee, C.~Ohm, A.~Soffer and ...}
+\inspiresetyears{2642414}{(2019,1) (2021,2) (2022,6) ...}
+\inspiresetauthorstat{1071846}{citations}{207838}
+\inspiresetfetched{2026-08-29}{739767}
+\end{code}
+
+Commit this file. Anyone --- including Overleaf, including you offline ---
+then compiles your document with correct numbers and no tooling at all. When
+the data is older than \opt{maxage} days, every compile says so:
+
+\begin{code}
+Package inspirehep Warning: The data dates from 2026-08-29 (about 130
+(inspirehep)                days ago).
+(inspirehep)                Refresh with -shell-escape or inspirehep-fetch.py
+\end{code}
+
+The build still succeeds; the warning is a reminder, not an error.
+
+\paragraph{What each side needs.}
+The self-fetch needs unrestricted shell escape \emph{and} \texttt{python3} on
+the path --- it delegates the network work to the helper, so there is exactly
+one implementation of the API handling. The helper alone needs only
+\texttt{python3}; it reads your sources to find every id you use, so in the
+common case it takes no arguments. Neither is needed to \emph{typeset}.
+
+\paragraph{Multi-file documents.}
+The automatic fetch scans only the main file. If your ids live in
+\verb|\input| files, run the helper yourself and list them:
+
+\begin{code}
+python3 inspirehep-fetch.py main.tex chapters/*.tex
+\end{code}
+
+\paragraph{Overleaf.}
+Overleaf disables shell escape and its compile servers have no network, so
+nothing can fetch \emph{there} --- but your document still typesets correct
+numbers, because they are just an \verb|\input| file. To keep them current
+from inside Overleaf:
+
+\begin{enumerate}
+  \item Upload \texttt{inspirehep.sty} to the project.
+  \item Add \texttt{inspirehep-data.tex} with \emph{New file $\to$ From
+    external URL}, pointing at the raw copy in your repository (kept fresh by
+    CI or your local builds).
+  \item Overleaf gives linked files a \emph{Refresh} button: new numbers are
+    one click, no recompile tricks.
+\end{enumerate}
+
+Overleaf's Git sync does not fetch submodules, so include the \texttt{.sty}
+as a plain file there.
+
+\section{Papers}
+
+The id is the number in the record's URL:
+\texttt{inspirehep.net/literature/}\textbf{\texttt{2642414}}.
+
+\subsection{\texttt{\textbackslash inspirepub}: one command, options for what it shows}
+
+\begin{demo}
+\inspirepub{2642414}
+\end{demo}
+
+The title came from INSPIRE, linked to the record, with the live citation
+count. Each piece is an option:
+
+\begin{demo}
+\inspirepub[year]{1701002}
+\end{demo}
+
+\begin{demo}
+\inspirepub[cites=false]{2642414}
+\end{demo}
+
+\begin{demo}
+\inspirepub[link=false, cites=false]{2642414}
+\end{demo}
+
+Prefer your own wording? Your title, INSPIRE's count:
+
+\begin{demo}
+\inspirepub[title={A muon collider design study}]{2642414}
+\end{demo}
+
+And \opt{ref} swaps the title for the full reference, exactly as INSPIRE
+formats it (see the next subsection):
+
+\begin{demo}
+\inspirepub[ref, cites=false]{1701002}
+\end{demo}
+
+\subsection{The pieces, separately}
+
+Everything \verb|\inspirepub| assembles is also a command of its own, for
+building your own layout:
+
+\begin{demo}
+\begin{tabular}{@{}ll@{}}
+  title & \inspiretitle{2642414}       \\
+  count & \inspirecites{2642414}       \\
+  year  & \inspireyear{2642414}        \\
+  key   & \texttt{\inspirekey{2642414}}
+\end{tabular}
+\end{demo}
+
+\subsection{References}
+
+\verb|\inspireref| gives the reference as INSPIRE itself renders it ---
+authors, journal, errata, DOI, arXiv number --- so it matches what everyone
+else in the field cites, and there is no author-list or journal-abbreviation
+logic in this package to get wrong.
+
+\begin{demo}
+\inspireref[cites=false]{1701002}
+\end{demo}
+
+By default it, too, carries the count (\opt{cites=false} above turned it
+off). The \opt{style} option picks INSPIRE's European numbering
+(\opt{latex-eu}, the default: volume (year) page) or American
+(\opt{latex-us}: volume, page (year)); it applies at fetch time, so set it as
+a package option.
+
+\subsection{A \texttt{.bib} file you never write}
+
+\verb|\inspirecite{<id>}| is \verb|\cite| by INSPIRE id. The fetcher collects
+INSPIRE's own \BibTeX{} entry --- verbatim, from
+\texttt{?format=bibtex} --- for every id you cite, into
+\texttt{inspirehep-refs.bib}:
+
+\begin{code}
+\usepackage{inspirehep}
+...
+as shown in \inspirecite{1701002}, ...
+...
+\bibliographystyle{unsrt}
+\bibliography{inspirehep-refs}
+\end{code}
+
+The generated file begins:
+
+\begin{code}
+%% GENERATED by inspirehep-fetch.py -- do not edit.
+@article{Lee:2018pag,
+    author = "Lee, Lawrence and Ohm, Christian and Soffer, Abner and
+              Yu, Tien-Tien",
+    title = "{Collider Searches for Long-Lived Particles Beyond the
+              Standard Model}",
+    ...
+\end{code}
+
+You never handle a \BibTeX{} key yourself --- though \verb|\inspirekey{<id>}|
+hands it to you if you want it (it is
+\texttt{\inspirekey{1701002}} here), so \verb|\inspirecite| composes with
+everything that expects \verb|\cite|.
 
 \section{People}
-Every author command takes the id it is asking about, so one document can
-discuss several people. The id is the number in a profile URL,
-\texttt{inspirehep.net/authors/\textbf{1071846}}, or a BAI such as
-\texttt{J.Smith.1}.
-\begin{Verbatim}[frame=single,fontsize=\small]
-\inspirepapers{1071846}      \inspirecitations[round=1000]{1071846}
-\inspirehindex{1071846}      \inspireauthorstat{1071846}{citations}
-\end{Verbatim}
-\opt{round} rounds \emph{down}, so ``over $N$'' stays true as the real figure
-grows.
+
+The id is the number in a profile URL,
+\texttt{inspirehep.net/authors/}\textbf{\texttt{1071846}}, or a BAI such as
+\texttt{J.Smith.1}. Every command takes the id it is asking about --- there is
+deliberately no package-wide author --- so one document can discuss several
+people:
+
+\begin{demo}
+\begin{tabular}{@{}lrrr@{}}
+            & papers & citations & $h$ \\
+  L.~Lee    & \inspirepapers{1071846}
+            & \inspirecitations{1071846}
+            & \inspirehindex{1071846} \\
+  T.~Golling& \inspirepapers{1008080}
+            & \inspirecitations{1008080}
+            & \inspirehindex{1008080}
+\end{tabular}
+\end{demo}
+
+\subsection{Round numbers that stay true}
+
+A summary line usually wants ``over $N$'', and the rounding must go
+\emph{down}: rounded up, the claim is false the moment it is typeset.
+\opt{round=} rounds any figure down to a multiple of its value:
+
+\begin{demo}
+Over \inspirepapers[round=100]{1071846} papers, with over
+\inspirecitations[round=1000]{1071846} citations and an
+$h$-index of \inspirehindex{1071846}.
+\end{demo}
+
+\verb|\inspireauthorstat{<id>}{<key>}| is the general form behind all three,
+with \opt{<key>} one of \opt{papers}, \opt{citations}, \opt{hindex}:
+
+\begin{demo}
+\inspireauthorstat[round=1000]{1071846}{citations}
+\end{demo}
 
 \section{Plots}
-With the \opt{plots} option, \verb|\inspireplot{<id>}| draws citations per year
-for a paper and \verb|\inspireauthorplot{<id>}{papers|\texttt{|}\verb|citations}|
-the same for a person. The default is one line with axis lines only where they
-carry information; \verb|\inspireplotstyle| takes any \pkg{pgfplots} axis keys.
+
+Load the package with the \opt{plots} option (it pulls in \pkg{pgfplots},
+which is why it is opt-in --- a CV that never plots should not pay for
+Ti\emph{k}Z). \verb|\inspireplot{<id>}| is the citation history of one paper:
+
+\begin{demo}
+\inspireplot{2642414}
+\end{demo}
+
+\verb|\inspireauthorplot{<id>}{papers}| or \verb|{citations}| is a person's
+output or impact over time:
+
+\begin{demo}
+\inspireauthorplot{1071846}{papers}
+\end{demo}
+
+The default style is deliberately spare: one line, axis lines only where they
+carry information, no grid, box, marks or legend. Three hooks change it ---
+\verb|\inspireplotwidth|, \verb|\inspireplotheight|, and
+\verb|\inspireplotstyle|, which takes any \pkg{pgfplots} axis keys:
+
+\begin{demo}
+{\renewcommand{\inspireplotwidth}{0.6\linewidth}%
+ \renewcommand{\inspireplotheight}{3cm}%
+ \renewcommand{\inspireplotstyle}{ymajorgrids,
+   every axis plot/.append style={red!60!black}}%
+ \inspireauthorplot{1071846}{citations}}
+\end{demo}
+
+Braces confine the change to one plot; at the top level it holds for all of
+them.
+
+\section{Numbers and separators}
+
+Figures are digit-grouped with a comma by default. \opt{sep=} chooses another
+convention, per call or document-wide, and \opt{sepstring=} takes anything
+else:
+
+\begin{demo}
+\begin{tabular}{@{}ll@{}}
+  \texttt{sep=comma}      & \inspirecitations{1071846} \\
+  \texttt{sep=period}     & \inspirecitations[sep=period]{1071846} \\
+  \texttt{sep=space}      & \inspirecitations[sep=space]{1071846} \\
+  \texttt{sep=thin}       & \inspirecitations[sep=thin]{1071846} \\
+  \texttt{sep=underscore} & \inspirecitations[sep=underscore]{1071846} \\
+  \texttt{sep=none}       & \inspirecitations[sep=none]{1071846} \\
+  \texttt{sepstring='}    & \inspirecitations[sepstring={'}]{1071846}
+\end{tabular}
+\end{demo}
+
+Set once for the whole document with
+\verb|\usepackage[sep=thin]{inspirehep}| or anywhere with
+\verb|\inspiresetup{sep=thin}|; either way a per-call option still wins for
+that one call, and a change made inside a group ends with the group.
+
+\section{When data is missing}
+
+An id the data file knows nothing about --- brand new, mistyped, or never
+fetched --- typesets a visible marker rather than something silently wrong,
+and flags itself so the next fetch asks about it:
+
+\begin{demo}
+\inspirepub{999999999}
+\end{demo}
+
+Fresh papers deserve better than advertising a zero: counts below
+\opt{mincites} (default 1) print nothing at all.
+
+\begin{demo}
+before\inspirecites{999999999}after
+  ({\inspiresetup{mincites=1000}%
+    also nothing: 152 < 1000\inspirecites{1298030}})
+\end{demo}
+
+Fallback values can be declared in the document, used only until the real
+figures arrive --- handy for a repository's first ever build, and they never
+override fetched data:
+
+\begin{demo}
+\inspiredefaultauthorstat{20000000}{papers}{42}
+\inspiredefaultauthorstat{1071846}{papers}{9}
+never fetched: \inspirepapers{20000000};
+fetched wins: \inspirepapers{1071846}
+\end{demo}
 
 \section{Options}
-Every option below is both a package option and a per-call option, and
-\verb|\inspiresetup{...}| changes any of them mid-document.
+
+Every option is both a package option and (where it makes sense per call) an
+optional argument; \verb|\inspiresetup{...}| changes any of them
+mid-document.
 
 \begin{center}\small
-\begin{tabular}{@{}lll@{}}
+\begin{tabular}{@{}llp{7.2cm}@{}}
 \toprule
 Option & Default & Meaning \\
 \midrule
-\opt{cites}    & \opt{true}  & show the citation count \\
-\opt{ref}      & \opt{false} & the full reference instead of the title \\
-\opt{year}     & \opt{false} & append the publication year \\
-\opt{link}     & \opt{true}  & hyperlink the title \\
-\opt{title}    & ---         & override the fetched title \\
-\opt{round}    & \opt{1}     & round a figure down to a multiple of this \\
-\opt{sep}      & \opt{comma} & \opt{comma}, \opt{period}, \opt{space}, \opt{thin}, \opt{underscore}, \opt{none} \\
-\opt{sepstring}& ---         & any other separator \\
-\opt{style}    & \opt{latex-eu} & reference format: \opt{latex-eu} or \opt{latex-us} \\
-\opt{plots}    & \opt{false} & load \pkg{pgfplots} \\
-\opt{data}     & \opt{inspirehep-data} & basename of the generated file \\
-\opt{bib}      & \opt{inspirehep-refs} & basename of the generated \texttt{.bib} \\
-\opt{maxage}   & \opt{120}   & days before the data is called stale \\
-\opt{mincites} & \opt{1}     & counts below this print nothing \\
-\opt{fetch}    & \opt{auto}  & \opt{auto}, \opt{on} or \opt{off} \\
+\opt{cites}     & \opt{true}  & show the citation count \\
+\opt{ref}       & \opt{false} & full reference instead of the title \\
+\opt{year}      & \opt{false} & append the publication year \\
+\opt{link}      & \opt{true}  & hyperlink the title (needs \pkg{hyperref};
+                                plain text without it) \\
+\opt{title}     & ---         & override the fetched title \\
+\opt{round}     & \opt{1}     & round a figure \emph{down} to a multiple of this \\
+\opt{mincites}  & \opt{1}     & counts below this print nothing \\
+\opt{sep}       & \opt{comma} & \opt{comma}, \opt{period}, \opt{space},
+                                \opt{thin}, \opt{underscore}, \opt{none} \\
+\opt{sepstring} & ---         & any other separator text \\
+\opt{plots}     & \opt{false} & load \pkg{pgfplots} for the plotting commands \\
+\opt{style}     & \opt{latex-eu} & reference format, \opt{latex-eu} or
+                                   \opt{latex-us} (applies at fetch time) \\
+\opt{data}      & \opt{inspirehep-data} & basename of the generated data file \\
+\opt{bib}       & \opt{inspirehep-refs} & basename of the generated \texttt{.bib} \\
+\opt{script}    & \opt{inspirehep-fetch.py} & where the self-fetch finds the
+                                              helper (a submodule path, say) \\
+\opt{maxage}    & \opt{120}   & days before the data is called stale \\
+\opt{fetch}     & \opt{auto}  & \opt{auto}, \opt{on} (warn if impossible),
+                                \opt{off} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\section{Changing how things look}
-\begin{Verbatim}[frame=single,fontsize=\small]
-\renewcommand{\inspiretitleformat}[1]{\textbf{#1}}
-\renewcommand{\inspirecitestext}[1]{#1~cites}
-\renewcommand{\inspirecitesformat}[1]{\nobreakspace{\small[#1]}}
-\renewcommand{\inspireyearformat}[1]{\hfill #1}
-\renewcommand{\inspireplotstyle}{ymajorgrids}
-\end{Verbatim}
+\section{House style}
 
-\section{Limits}
-Fetching from the package needs \texttt{curl} and unrestricted shell escape;
-the helper is the way round both. Counts are whatever INSPIRE reports,
-including self-citations.
+Five hooks control how things are set; redefine any of them:
+
+\begin{demo}
+{\renewcommand{\inspiretitleformat}[1]{\textsc{#1}}%
+ \renewcommand{\inspirecitestext}[1]{cited #1 times}%
+ \renewcommand{\inspirecitesformat}[1]{ --- \emph{#1}}%
+ \inspirepub{1298030}}
+\end{demo}
+
+\begin{code}
+\renewcommand{\inspiretitleformat}[1]{\textbf{#1}}   % around the title
+\renewcommand{\inspirecitestext}[1]{#1~citations}    % the words
+\renewcommand{\inspirecitesformat}[1]{~{\small[#1]}} % attaching them
+\renewcommand{\inspireyearformat}[1]{~(#1)}          % the year
+\renewcommand{\inspirenumformat}[1]{...}             % digit grouping itself
+\end{code}
+
+A CV-flavoured example --- the count as quiet grey metadata:
+
+\begin{demo}
+{\renewcommand{\inspirecitesformat}[1]{%
+   \nobreakspace{\small\textcolor{black!45}{[#1]}}}%
+ \inspirepub{2642414}}
+\end{demo}
+
+\section{The data file, for the curious}
+
+The declarations a fetcher writes are ordinary commands, so you can also set
+or patch anything by hand --- useful for records INSPIRE does not have:
+
+\begin{center}\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\verb|\inspiresetcites{<id>}{<n>}|            & a record's citation count \\
+\verb|\inspiresettitle{<id>}{<title>}|        & its title \\
+\verb|\inspiresetkey{<id>}{<key>}|            & its \BibTeX{} key \\
+\verb|\inspiresetref{<id>}{<reference>}|      & its formatted reference \\
+\verb|\inspiresetyears{<id>}{(y,n) (y,n) ...}|& its citations per year \\
+\verb|\inspiresetauthorstat{<id>}{<key>}{<n>}|& a person's figure \\
+\verb|\inspiresetauthoryears{<id>}{<kind>}{...}| & a person's series \\
+\verb|\inspiresetfetched{<date>}{<dayno>}|    & when it was all fetched \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Requirements and limits}
+
+Typesetting needs a current \LaTeX{} (\pkg{xparse} and \pkg{l3keys2e} from the
+kernel), plus \pkg{pgfplots} if and only if you pass \opt{plots}. Refreshing
+the data needs \texttt{python3} (standard library only); the self-fetch
+additionally needs unrestricted shell escape. Counts are whatever INSPIRE
+reports, self-citations included. The automatic fetch scans only the main
+file; the helper takes a file list.
 
 \section{Licence}
-LPPL 1.3c or later. Maintained by Lawrence Lee;
+
+LPPL 1.3c or later; maintained by Lawrence Lee. Issues and contributions:
 \url{https://github.com/lawrenceleejr/inspirehep-latex}.
 
 \end{document}

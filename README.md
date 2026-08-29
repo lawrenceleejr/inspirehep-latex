@@ -40,8 +40,9 @@ an example, and the optional helper described below.
 The figures come from `inspirehep-data.tex`. There are two ways to produce it,
 and they write the same file — use whichever suits your setup.
 
-**Let the package do it.** With unrestricted shell escape, the package fetches
-with `curl` at the end of the run and writes the file itself:
+**Let the package do it.** With unrestricted shell escape (and `python3` on
+the path), the package refreshes at the end of the run and writes the file
+itself:
 
 ```sh
 pdflatex -shell-escape cv.tex     # fetches, writes inspirehep-data.tex
@@ -151,6 +152,7 @@ house style once and any one entry can depart from it.
 | `bib` | `inspirehep-refs` | basename of the generated `.bib` |
 | `maxage` | `120` | days before the data is called stale; `0` never warns |
 | `mincites` | `1` | counts below this print nothing |
+| `script` | `inspirehep-fetch.py` | where the self-fetch finds the helper (a submodule path, say) |
 | `fetch` | `auto` | `auto`, `on`, or `off` |
 
 `\inspiresetup{<options>}` changes any of them mid-document.
@@ -182,27 +184,25 @@ back to plain text when it does not, so load order does not matter.
 
 ## How it works, and what it does not do
 
-The package asks INSPIRE for two things: the `citation-summary` aggregation for
-your author profile — the same one INSPIRE's own profile pages use, so the
-figures match what a reader sees there — and one batched query for the citation
-counts of every record your document mentions.
+The package asks INSPIRE for four things: each record's metadata (title,
+citation count, BibTeX key), its reference as INSPIRE's own renderer formats it
+(`?format=latex-eu` or `latex-us`), its BibTeX entry verbatim
+(`?format=bibtex`), and the `earliest_date` facet for anything plotted. Author
+figures use the same `citation-summary` aggregation as INSPIRE's profile pages,
+so the numbers match what a reader sees there.
 
-The LaTeX-side fetch has three sharp edges worth knowing about if you read the
-source: a `%` anywhere in a shell command is a TeX comment, so the query goes
-through `curl -G --data-urlencode` rather than a query string; a `~` opening a
-continuation line is swallowed, silently running arguments together; and the
-JSON must be read with every catcode set to *other*, or the `%`, `&` and `_` in
-an INSPIRE response are read as comment, alignment and subscript and no pattern
-ever matches.
+All of that lives in `inspirehep-fetch.py`. When the package refreshes itself
+through shell escape it runs that same helper, so there is exactly one
+implementation of the API handling rather than two that can disagree.
 
 Known limits:
 
-- Fetching needs `curl` on the path and unrestricted shell escape. The Python
-  helper is the way round both.
-- The package pairs records with counts by reading two parallel lists out of the
-  response. If they ever come back different lengths it writes nothing and says
-  so, rather than writing something wrong. The helper parses the JSON properly
-  and has no such limit.
+- Refreshing needs `python3` (standard library only); the self-fetch
+  additionally needs unrestricted shell escape. Neither is needed to typeset.
+- The automatic fetch scans only the main file; for `\input`-structured
+  documents, run the helper yourself with the file list.
+- One unknown id degrades on its own: a warning, a visible `[? ...]` marker in
+  the output, and the rest of the document still refreshes.
 - Counts are whatever INSPIRE reports, including self-citations.
 
 ## Licence

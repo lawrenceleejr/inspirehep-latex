@@ -337,24 +337,50 @@ def main(argv: list[str] | None = None) -> int:
           f"{len(wanted['plots'])} plot(s), {len(wanted['bibtex'])} citation(s), "
           f"{len(wanted['authors'])} author(s)")
 
-    try:
-        records = fetch_records(wanted["records"], args.style)
-        plots = {recid: fetch_years(f"refersto recid {recid}") for recid in wanted["plots"]}
-        authors, author_years = {}, {}
-        for aid in wanted["authors"]:
-            bai = resolve_bai(aid)
-            authors[aid] = author_summary(bai)
-            author_years[aid] = {
-                "papers": fetch_years(f"a {bai}"),
-                "citations": fetch_years(f"refersto a {bai}"),
-            }
-        bibs = {recid: fetch_bibtex(recid) for recid in wanted["bibtex"]}
-    except Exception as exc:  # noqa: BLE001 - every failure degrades the same way
-        print(f"INSPIRE-HEP lookup failed: {exc}", file=sys.stderr)
+    # One unknown id must not cost the rest of the document its refresh, so
+    # each item degrades on its own: a warning, and the file simply carries no
+    # entry for it -- which the package typesets as a visible [? ...] marker.
+    problems = 0
+
+    def attempt(what, fn, *args_):
+        nonlocal problems
+        try:
+            return fn(*args_)
+        except Exception as exc:  # noqa: BLE001 - warn and carry on
+            problems += 1
+            print(f"  ! {what}: {exc}", file=sys.stderr)
+            return None
+
+    records = attempt("records", fetch_records, wanted["records"], args.style)
+    if records is None:
+        # The batched record query is the one lookup nothing works without;
+        # treat its failure as the network being down.
+        print("INSPIRE-HEP lookup failed.", file=sys.stderr)
         if args.strict:
             return 1
         print("Keeping the existing figures; the document will still build.", file=sys.stderr)
         return 0
+
+    plots, authors, author_years, bibs = {}, {}, {}, {}
+    for recid in wanted["plots"]:
+        if (years := attempt(f"plot {recid}", fetch_years, f"refersto recid {recid}")) is not None:
+            plots[recid] = years
+    for aid in wanted["authors"]:
+        if (bai := attempt(f"author {aid}", resolve_bai, aid)) is None:
+            continue
+        if (summary := attempt(f"author {aid}", author_summary, bai)) is not None:
+            authors[aid] = summary
+        author_years[aid] = {}
+        for kind, query in (("papers", f"a {bai}"), ("citations", f"refersto a {bai}")):
+            if (years := attempt(f"author {aid} {kind}", fetch_years, query)) is not None:
+                author_years[aid][kind] = years
+    for recid in wanted["bibtex"]:
+        if (bib := attempt(f"bibtex {recid}", fetch_bibtex, recid)) is not None:
+            bibs[recid] = bib
+
+    if problems and args.strict:
+        print(f"{problems} lookup(s) failed and --strict is set.", file=sys.stderr)
+        return 1
 
     content = render(records, plots, authors, author_years, primary)
     if args.to_stdout:
