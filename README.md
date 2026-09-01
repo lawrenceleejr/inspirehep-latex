@@ -148,41 +148,50 @@ you want otherwise.
 
 ## Keeping a document current automatically
 
-`example/refresh-inspire.yml` is a GitHub Actions workflow you can copy into the
-repository holding your document. Weekly, or on a button, it runs the fetcher
-against your main `.tex`, commits the data file it writes, and keeps a copy as a
-run artifact.
+`example/refresh-inspire.yml` is a GitHub Actions workflow you can copy into a
+repository. Weekly, or on a button, it runs the fetcher against your main
+`.tex`, commits the data file it writes, and keeps a copy as a run artifact.
 
-The commit is the whole mechanism. How it reaches Overleaf depends on where the
-document lives.
-
-**Document in the repository.** Link the Overleaf project to it once
-(*Menu → Sync → GitHub*) and the refreshed figures arrive with everything else:
-*Sync → GitHub → Pull GitHub changes*. No URL, nothing else to configure. Note
-that Overleaf's GitHub sync is a paid feature and does not poll — you press
-Pull, so the numbers move when you are looking at the document rather than
-behind your back. And since the workflow commits, a later *Push Overleaf
-changes* can conflict on the data file; pull first and it resolves, because
-nothing but the fetcher ever edits it.
-
-**Document only in Overleaf.** Then the repository exists just to run the
-fetcher, and one file has to cross over. *Add file → From external URL* with
+To get the result into Overleaf, point it at the committed file —
+*Add file → From external URL*:
 
 ```
 https://raw.githubusercontent.com/<user>/<repo>/main/inspirehep-data.tex
 ```
 
 named `inspirehep-data.tex`. Overleaf then shows a **Refresh** button on that
-file, which re-fetches whatever the workflow last committed.
+file, which re-fetches whatever the workflow last committed. Add
+`inspirehep.sty` the same way, or upload it once by hand.
 
-Neither route can use the workflow **artifact**, which is why the workflow
-commits rather than relying on the upload: artifacts are served as ZIP archives
+### Overleaf's GitHub sync will not carry the workflow
+
+It is tempting to skip the URL and let Overleaf's GitHub sync bring the data
+file over with everything else. That does not work if the workflow lives in the
+same repository. Linking fails with:
+
+> The Overleaf GitHub sync service couldn't sync GitHub Workflow files (in
+> `.github/workflows/`). Please authorize Overleaf to edit your GitHub workflow
+> files and try again.
+
+GitHub requires the `workflow` OAuth scope before any app may write under
+`.github/workflows/`, and Overleaf's sync pushes the whole tree. The failure can
+also happen *after* Overleaf has created the repository, leaving an orphan you
+must delete before retrying.
+
+If you want GitHub sync anyway, keep the two apart: let the synced repository
+hold only the document, and run the workflow from a second repository that
+pushes the data file into the first with a deploy key or a fine-grained token.
+The external URL above avoids all of it and needs no Overleaf-to-GitHub
+authorisation.
+
+A workflow **artifact** cannot be used either way, which is why the workflow
+commits rather than relying on its upload: artifacts are served as ZIP archives
 rather than as the file itself, and downloading one needs an authenticated
 request even on a public repository, while Overleaf issues a plain
 unauthenticated GET.
 
-Either way Overleaf cannot run the fetcher itself — no shell escape, no network
-— which is what the workflow is for.
+Overleaf cannot run the fetcher itself — no shell escape, no network — which is
+what the workflow is for.
 
 ## Install, other ways
 
