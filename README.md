@@ -149,46 +149,58 @@ you want otherwise.
 ## Keeping a document current automatically
 
 `example/refresh-inspire.yml` is a GitHub Actions workflow you can copy into a
-repository. Weekly, or on a button, it runs the fetcher against your main
-`.tex`, commits the data file it writes, and keeps a copy as a run artifact.
+repository. On every push, weekly, and on a button, it runs the fetcher against
+your main `.tex`, commits the data file it writes, and keeps a copy as a run
+artifact.
 
-To get the result into Overleaf, point it at the committed file —
-*Add file → From external URL*:
+### If the document lives in the repository
+
+Link the Overleaf project to it — *Menu → Sync → GitHub* — and the refreshed
+figures arrive with everything else via *Sync → GitHub → Pull GitHub changes*.
+No URL anywhere.
+
+**Overleaf will refuse the first time**, because GitHub requires the `workflow`
+OAuth scope before any app may write under `.github/workflows/`, and Overleaf's
+sync pushes the whole tree:
+
+> The Overleaf GitHub sync service couldn't sync GitHub Workflow files (in
+> `.github/workflows/`). Please authorize Overleaf to edit your GitHub workflow
+> files and try again.
+
+Take it literally: there is a button to **authorize workflow editing**. Click it,
+retry the link, and it works. If that first attempt already created the
+repository before failing, delete the orphan or choose a new name.
+
+Overleaf's GitHub sync is a paid feature and does not poll — you press Pull, so
+the numbers move when you are looking at the document rather than behind your
+back. And since the workflow commits, a later *Push Overleaf changes* can
+conflict on the data file; pull first and it resolves, because nothing but the
+fetcher ever edits it.
+
+### If the document lives only in Overleaf
+
+Then the repository exists just to run the fetcher, and one file has to cross
+over. *Add file → From external URL*:
 
 ```
 https://raw.githubusercontent.com/<user>/<repo>/main/inspirehep-data.tex
 ```
 
 named `inspirehep-data.tex`. Overleaf then shows a **Refresh** button on that
-file, which re-fetches whatever the workflow last committed. Add
-`inspirehep.sty` the same way, or upload it once by hand.
+file, which re-fetches whatever the workflow last committed. This route needs no
+Overleaf-to-GitHub authorisation at all.
 
-### Overleaf's GitHub sync will not carry the workflow
+### Two notes on the workflow itself
 
-It is tempting to skip the URL and let Overleaf's GitHub sync bring the data
-file over with everything else. That does not work if the workflow lives in the
-same repository. Linking fails with:
+It commits rather than relying on its own **artifact**, because Overleaf cannot
+read one either way: artifacts are served as ZIP archives rather than as the file
+itself, and downloading one needs an authenticated request even on a public
+repository, while Overleaf issues a plain unauthenticated GET.
 
-> The Overleaf GitHub sync service couldn't sync GitHub Workflow files (in
-> `.github/workflows/`). Please authorize Overleaf to edit your GitHub workflow
-> files and try again.
-
-GitHub requires the `workflow` OAuth scope before any app may write under
-`.github/workflows/`, and Overleaf's sync pushes the whole tree. The failure can
-also happen *after* Overleaf has created the repository, leaving an orphan you
-must delete before retrying.
-
-If you want GitHub sync anyway, keep the two apart: let the synced repository
-hold only the document, and run the workflow from a second repository that
-pushes the data file into the first with a deploy key or a fine-grained token.
-The external URL above avoids all of it and needs no Overleaf-to-GitHub
-authorisation.
-
-A workflow **artifact** cannot be used either way, which is why the workflow
-commits rather than relying on its upload: artifacts are served as ZIP archives
-rather than as the file itself, and downloading one needs an authenticated
-request even on a public repository, while Overleaf issues a plain
-unauthenticated GET.
+Its own commit does **not** re-trigger it: a push made with the default
+`GITHUB_TOKEN` does not start further workflow runs. The `[skip ci]` in the
+commit message is the backstop for anyone who swaps in a personal access token,
+which does.
 
 Overleaf cannot run the fetcher itself — no shell escape, no network — which is
 what the workflow is for.

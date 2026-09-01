@@ -5,32 +5,40 @@
 # below to your main .tex file, and it runs the fetcher weekly (or on a button),
 # commits the data file it writes, and keeps a copy as a run artifact.
 #
-# --- getting the result into Overleaf --------------------------------------
+# --- getting the result into Overleaf: GitHub sync ------------------------
 #
-# Point Overleaf at the committed file: Add file -> From external URL, with
+# If the document lives in this repository, link the Overleaf project to it
+# (Menu -> Sync -> GitHub) and the refreshed data file arrives with everything
+# else: Sync -> GitHub -> "Pull GitHub changes".  No URL anywhere.
 #
-#   https://raw.githubusercontent.com/<user>/<repo>/main/inspirehep-data.tex
-#
-# named inspirehep-data.tex.  Overleaf then shows a "Refresh" button on that
-# file, which re-fetches whatever this workflow last committed.  Add
-# inspirehep.sty the same way, or upload it once by hand.
-#
-# Do NOT expect Overleaf's GitHub sync to carry this workflow.  Linking an
-# Overleaf project to a repository that contains .github/workflows/ fails:
+# Overleaf will refuse at first, because GitHub requires the `workflow' OAuth
+# scope before any app may write under .github/workflows/, and Overleaf's sync
+# pushes the whole tree:
 #
 #   The Overleaf GitHub sync service couldn't sync GitHub Workflow files
 #   (in .github/workflows/).  Please authorize Overleaf to edit your GitHub
 #   workflow files and try again.
 #
-# GitHub requires the `workflow' OAuth scope before any app may write under
-# .github/workflows/, and Overleaf's sync pushes the whole tree.  Worse, that
-# failure can happen after Overleaf has already created the repository, leaving
-# an orphan you have to delete before retrying.
+# Take it literally: there is a button to authorize workflow editing.  Click
+# it, retry the link, and it works.  If the first attempt already created the
+# repository before failing, delete that orphan or choose a new name.
 #
-# So if you want Overleaf's GitHub sync as well, keep the two apart: let the
-# synced repository hold only the document, and run this workflow from a second
-# repository that pushes the data file into the first with a deploy key or a
-# fine-grained token.  The external URL above avoids all of that, and needs no
+# Overleaf's GitHub sync is a paid feature, and it does not poll -- you press
+# Pull, so the numbers move when you are looking at the document rather than
+# behind your back.  And because this workflow commits, a later "Push Overleaf
+# changes" can conflict on the data file; pull first and it resolves, since
+# nothing but the fetcher ever edits that file.
+#
+# --- or, if the document lives only in Overleaf ---------------------------
+#
+# Then this repository exists only to run the fetcher, and one file has to
+# cross over.  Add file -> From external URL, with
+#
+#   https://raw.githubusercontent.com/<user>/<repo>/main/inspirehep-data.tex
+#
+# named inspirehep-data.tex.  Overleaf shows a "Refresh" button on that file
+# from then on, which re-fetches whatever this workflow last committed.  Add
+# inspirehep.sty the same way, or upload it once by hand.  This route needs no
 # Overleaf-to-GitHub authorisation at all.
 #
 # --- why not the workflow artifact ----------------------------------------
@@ -47,17 +55,26 @@
 name: Refresh INSPIRE data
 
 on:
+  # Every push, so the figures are current the moment you touch the document.
+  #
+  # This workflow pushes a commit of its own, which looks like a loop and is
+  # not: a push made with the default GITHUB_TOKEN does not trigger further
+  # workflow runs.  The [skip ci] in the commit message below is the backstop
+  # for anyone who swaps in a personal access token, which does trigger them.
+  push:
   schedule:
-    # Mondays at 06:00 UTC.  Citation counts move slowly; weekly is plenty.
+    # Mondays at 06:00 UTC.  Citation counts move slowly, so this is really
+    # just insurance for a document nobody has pushed to in a while.
     - cron: '0 6 * * 1'
   workflow_dispatch:          # and a button, for when you want it now
 
 permissions:
   contents: write             # the commit below; nothing else needs writing
 
-# Two runs committing to the same branch would race.
+# Two runs committing to one branch would race.  Per-ref, so work on a branch
+# never waits on main; never cancelling, so a run is not killed mid-push.
 concurrency:
-  group: refresh-inspire
+  group: refresh-inspire-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -74,13 +91,19 @@ jobs:
         with:
           python-version: '3.x'      # the fetcher needs only the standard library
 
-      # --strict, because a scheduled run exists only to refresh the figures:
-      # if INSPIRE cannot be reached there is nothing to do and the run should
-      # say so rather than commit yesterday's numbers again.  Drop it if you
-      # would rather a flaky network never turned the badge red.
+      # --strict everywhere except on a push.  A scheduled or manual run exists
+      # only to refresh the figures, so if INSPIRE cannot be reached it should
+      # say so rather than quietly do nothing.  A push is different: you were
+      # fixing a typo, and inspirehep.net having a bad minute is no reason to
+      # turn that red.  Without --strict a failed lookup leaves the committed
+      # numbers alone and exits 0.
       - name: Fetch from INSPIRE-HEP
         run: |
-          python3 inspirehep-fetch.py "$MAIN" --output "$DATA" --strict
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            python3 inspirehep-fetch.py "$MAIN" --output "$DATA"
+          else
+            python3 inspirehep-fetch.py "$MAIN" --output "$DATA" --strict
+          fi
 
       - name: Commit the refreshed figures
         run: |
