@@ -149,9 +149,18 @@ you want otherwise.
 ## Keeping a document current automatically
 
 `example/refresh-inspire.yml` is a GitHub Actions workflow you can copy into a
-repository. On every push, weekly, and on a button, it fetches the figures for
-your main `.tex`, commits the data file it writes, and keeps a copy as a run
-artifact.
+repository. On every push, weekly, and on a button it fetches everything your
+main `.tex` asks for, commits the two generated files, and keeps a copy of both
+as a run artifact:
+
+| File | Holds |
+| --- | --- |
+| `inspirehep-data.tex` | the figures — citation counts, titles, references, plots |
+| `inspirehep-refs.bib` | INSPIRE's own BibTeX entry, verbatim, for every id `\inspirecite`d |
+
+So `\bibliography{inspirehep-refs}` resolves without anyone hand-copying an
+entry, and the bibliography stays in step with the citations as you add them.
+The `.bib` is written only if the document actually cites something.
 
 It downloads the fetcher from this repository at run time, so nothing from
 inspirehep needs to live in your document's repository — no script, no

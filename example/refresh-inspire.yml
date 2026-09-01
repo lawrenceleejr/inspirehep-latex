@@ -85,7 +85,8 @@ concurrency:
 
 env:
   MAIN: main.tex                     # your document
-  DATA: inspirehep-data.tex          # what the fetcher writes
+  DATA: inspirehep-data.tex          # the figures
+  BIB:  inspirehep-refs.bib          # BibTeX for everything \inspirecite'd
 
   # Which version of the fetcher to run.  `main' tracks the latest; a tag
   # (v0.3, say) pins it, which is worth doing once a tag has what you need --
@@ -122,10 +123,16 @@ jobs:
       # numbers alone and exits 0.
       - name: Fetch from INSPIRE-HEP
         run: |
+          set -e
+          # --bib collects INSPIRE's own BibTeX entry, verbatim, for every id
+          # the document \inspirecite's, so \bibliography{inspirehep-refs}
+          # resolves without anyone hand-copying an entry.  It is written only
+          # if something is actually cited.
+          args="$MAIN --output $DATA --bib $BIB"
           if [ "$GITHUB_EVENT_NAME" = push ]; then
-            python3 inspirehep-fetch.py "$MAIN" --output "$DATA"
+            python3 inspirehep-fetch.py $args
           else
-            python3 inspirehep-fetch.py "$MAIN" --output "$DATA" --strict
+            python3 inspirehep-fetch.py $args --strict
           fi
 
       - name: Commit the refreshed figures
@@ -133,16 +140,26 @@ jobs:
           set -e
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Only the data file: the fetcher was downloaded into the working
-          # tree above and has no business being committed.
-          git add -- "$DATA"
-          # Nothing to do if the file is byte-identical, which happens when
-          # this runs twice in a day and no count moved.  On the weekly
-          # schedule it will normally differ, because the fetcher records the
-          # date it confirmed the numbers and that line drives the package's
-          # "these figures are getting old" warning -- so a weekly one-line
-          # commit is the point rather than noise.
-          if git diff --quiet --cached -- "$DATA"; then
+          # The generated files only.  The fetcher itself was downloaded into
+          # the working tree above and has no business being committed.  The
+          # .bib exists only if the document cites something, so it is added
+          # when present rather than unconditionally -- git add on a missing
+          # path is a fatal error, which under set -e would end the run.
+          staged=""
+          for f in "$DATA" "$BIB"; do
+            if [ -f "$f" ]; then
+              git add -- "$f"
+              staged="$staged $f"
+            fi
+          done
+          # Nothing to do if they are byte-identical, which happens when this
+          # runs twice in a day and no count moved.  On the weekly schedule the
+          # data file will normally differ, because the fetcher records the date
+          # it confirmed the numbers and that line drives the package's "these
+          # figures are getting old" warning -- so a weekly one-line commit is
+          # the point rather than noise.  The .bib changes far less often, since
+          # a published entry rarely does.
+          if git diff --quiet --cached -- $staged; then
             echo "unchanged; nothing to commit"
             exit 0
           fi
@@ -155,7 +172,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: inspirehep-data
-          path: ${{ env.DATA }}
+          # The .bib may not exist if nothing is cited; error still applies to
+          # the pair, and the data file is always written.
+          path: |
+            ${{ env.DATA }}
+            ${{ env.BIB }}
           if-no-files-found: error
           retention-days: 90
 
@@ -172,5 +193,9 @@ jobs:
               echo "$(grep -c '^\\inspiresetcites' "$DATA") record(s) tracked."
             else
               echo 'The fetch produced nothing.'
+            fi
+            if [ -f "$BIB" ]; then
+              echo
+              echo "$(grep -c '^@' "$BIB") BibTeX entr(y|ies) in $BIB."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
