@@ -1,36 +1,47 @@
-# Refresh the INSPIRE figures on a schedule, and keep a URL Overleaf can read.
+# Refresh the INSPIRE figures on a schedule, so a document never carries a
+# stale citation count.
 #
 # Copy this to .github/workflows/refresh-inspire.yml in the repository that
-# holds your document, and set MAIN below to your main .tex file.
+# holds your document, and set MAIN below to your main .tex file.  It runs the
+# fetcher, commits the data file it writes, and keeps a copy as a run artifact.
 #
-# It does two things with the generated data file:
+# The commit is the whole mechanism.  How it reaches Overleaf depends on where
+# your document actually lives.
 #
-#   1. commits it back to the repository, which gives it a permanent raw URL
-#   2. uploads it as a workflow artifact
+# --- if the document is in this repository ---------------------------------
 #
-# The commit is the part Overleaf needs.  A workflow artifact cannot be used
-# for this: artifacts are served as ZIP archives rather than as the file
-# itself, and downloading one needs an authenticated request even on a public
-# repository.  Overleaf fetches a plain unauthenticated URL, so it would get
-# neither the file nor permission.  A file committed to a public repository is
-# served raw, with no authentication, at a URL that never changes -- which is
-# exactly what Overleaf's refresh button re-fetches.  The artifact is still
-# worth having as a per-run record of what was fetched.
+# Link the Overleaf project to the repository once (Menu -> Sync -> GitHub),
+# and the refreshed data file arrives with everything else: Sync -> GitHub ->
+# "Pull GitHub changes".  Nothing else to set up, and no URL anywhere.
 #
-# --- wiring it to Overleaf -------------------------------------------------
+# Two things to know.  Overleaf's GitHub sync is a paid feature, and it does
+# not poll -- you press Pull, which means the numbers move when you are
+# looking at the document rather than behind your back.  And because this
+# workflow commits, a later "Push Overleaf changes" can conflict with the
+# bot's commits on the data file; pull before you push and it resolves itself,
+# since nothing but the fetcher ever edits that file.
 #
-# In your Overleaf project: Add file -> From external URL, then
+# --- if the document lives only in Overleaf --------------------------------
+#
+# Then this repository exists only to run the fetcher, and one file has to
+# cross over.  In the Overleaf project: Add file -> From external URL, with
 #
 #   https://raw.githubusercontent.com/<user>/<repo>/main/inspirehep-data.tex
 #
-# naming it inspirehep-data.tex.  Overleaf shows a "Refresh" button on that
-# file from then on; pressing it pulls whatever this workflow last committed.
-# Upload inspirehep.sty to the project root the same way, or once by hand --
-# Overleaf's Git sync does not fetch submodules, and it cannot run the fetcher
-# itself (no shell escape, no network).
+# named inspirehep-data.tex.  Overleaf shows a "Refresh" button on that file
+# from then on, which re-fetches whatever this workflow last committed.  Add
+# inspirehep.sty the same way, or upload it once by hand.
 #
-# Overleaf does not poll, so the numbers move when you press Refresh.  That is
-# usually what you want on a CV: the figures change only when you are looking.
+# --- why not the workflow artifact ----------------------------------------
+#
+# Neither route can use one, which is why this commits rather than relying on
+# the upload below.  Artifacts are served as ZIP archives rather than as the
+# file itself, and downloading one needs an authenticated request even on a
+# public repository, while Overleaf issues a plain unauthenticated GET.  The
+# artifact is still worth having as a per-run record of what was fetched.
+#
+# Overleaf cannot run the fetcher itself either way: no shell escape, no
+# network.  That is what this workflow is for.
 
 name: Refresh INSPIRE data
 
