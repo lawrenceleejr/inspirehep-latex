@@ -1,9 +1,15 @@
 # Refresh the INSPIRE figures on a schedule, so a document never carries a
 # stale citation count.
 #
-# Copy this to .github/workflows/refresh-inspire.yml in a repository, set MAIN
-# below to your main .tex file, and it runs the fetcher weekly (or on a button),
-# commits the data file it writes, and keeps a copy as a run artifact.
+# Copy this to .github/workflows/refresh-inspire.yml in a repository and set
+# MAIN below to your main .tex file.  On every push, weekly, and on a button it
+# fetches the figures, commits the data file it writes, and keeps a copy as a
+# run artifact.
+#
+# The fetcher is downloaded from the package repository at run time, so nothing
+# from inspirehep needs to live in your document's repository -- not the script,
+# not a submodule.  Only inspirehep.sty has to reach whatever compiles the
+# document, which for Overleaf means uploading it to the project once.
 #
 # --- getting the result into Overleaf: GitHub sync ------------------------
 #
@@ -81,6 +87,12 @@ env:
   MAIN: main.tex                     # your document
   DATA: inspirehep-data.tex          # what the fetcher writes
 
+  # Which version of the fetcher to run.  `main' tracks the latest; a tag
+  # (v0.3, say) pins it, which is worth doing once a tag has what you need --
+  # check that it is not older than a fix you depend on before pinning to one.
+  PKG: lawrenceleejr/inspirehep-latex
+  PKG_REF: main
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -90,6 +102,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'      # the fetcher needs only the standard library
+
+      # -f matters: without it a bad PKG_REF gets you GitHub's "404: Not Found"
+      # page saved as a Python file, and a baffling syntax error later.  The
+      # --help run then proves what arrived really is the script.
+      - name: Fetch the helper from the package repository
+        run: |
+          set -e
+          curl -fsSL -o inspirehep-fetch.py \
+            "https://raw.githubusercontent.com/$PKG/$PKG_REF/inspirehep-fetch.py"
+          python3 inspirehep-fetch.py --help > /dev/null
+          echo "using inspirehep-fetch.py from $PKG@$PKG_REF"
 
       # --strict everywhere except on a push.  A scheduled or manual run exists
       # only to refresh the figures, so if INSPIRE cannot be reached it should
@@ -110,6 +133,8 @@ jobs:
           set -e
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Only the data file: the fetcher was downloaded into the working
+          # tree above and has no business being committed.
           git add -- "$DATA"
           # Nothing to do if the file is byte-identical, which happens when
           # this runs twice in a day and no count moved.  On the weekly

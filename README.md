@@ -149,9 +149,15 @@ you want otherwise.
 ## Keeping a document current automatically
 
 `example/refresh-inspire.yml` is a GitHub Actions workflow you can copy into a
-repository. On every push, weekly, and on a button, it runs the fetcher against
+repository. On every push, weekly, and on a button, it fetches the figures for
 your main `.tex`, commits the data file it writes, and keeps a copy as a run
 artifact.
+
+It downloads the fetcher from this repository at run time, so nothing from
+inspirehep needs to live in your document's repository — no script, no
+submodule. Set `PKG_REF` to a tag instead of `main` if you would rather pin the
+version. Only `inspirehep.sty` has to reach whatever compiles the document,
+which on Overleaf means uploading it to the project once.
 
 ### If the document lives in the repository
 
