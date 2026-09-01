@@ -1,0 +1,116 @@
+# Refresh the INSPIRE figures on a schedule, and keep a URL Overleaf can read.
+#
+# Copy this to .github/workflows/refresh-inspire.yml in the repository that
+# holds your document, and set MAIN below to your main .tex file.
+#
+# It does two things with the generated data file:
+#
+#   1. commits it back to the repository, which gives it a permanent raw URL
+#   2. uploads it as a workflow artifact
+#
+# The commit is the part Overleaf needs.  A workflow artifact cannot be used
+# for this: artifacts are served as ZIP archives rather than as the file
+# itself, and downloading one needs an authenticated request even on a public
+# repository.  Overleaf fetches a plain unauthenticated URL, so it would get
+# neither the file nor permission.  A file committed to a public repository is
+# served raw, with no authentication, at a URL that never changes -- which is
+# exactly what Overleaf's refresh button re-fetches.  The artifact is still
+# worth having as a per-run record of what was fetched.
+#
+# --- wiring it to Overleaf -------------------------------------------------
+#
+# In your Overleaf project: Add file -> From external URL, then
+#
+#   https://raw.githubusercontent.com/<user>/<repo>/main/inspirehep-data.tex
+#
+# naming it inspirehep-data.tex.  Overleaf shows a "Refresh" button on that
+# file from then on; pressing it pulls whatever this workflow last committed.
+# Upload inspirehep.sty to the project root the same way, or once by hand --
+# Overleaf's Git sync does not fetch submodules, and it cannot run the fetcher
+# itself (no shell escape, no network).
+#
+# Overleaf does not poll, so the numbers move when you press Refresh.  That is
+# usually what you want on a CV: the figures change only when you are looking.
+
+name: Refresh INSPIRE data
+
+on:
+  schedule:
+    # Mondays at 06:00 UTC.  Citation counts move slowly; weekly is plenty.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:          # and a button, for when you want it now
+
+permissions:
+  contents: write             # the commit below; nothing else needs writing
+
+# Two runs committing to the same branch would race.
+concurrency:
+  group: refresh-inspire
+  cancel-in-progress: false
+
+env:
+  MAIN: main.tex                     # your document
+  DATA: inspirehep-data.tex          # what the fetcher writes
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'      # the fetcher needs only the standard library
+
+      # --strict, because a scheduled run exists only to refresh the figures:
+      # if INSPIRE cannot be reached there is nothing to do and the run should
+      # say so rather than commit yesterday's numbers again.  Drop it if you
+      # would rather a flaky network never turned the badge red.
+      - name: Fetch from INSPIRE-HEP
+        run: |
+          python3 inspirehep-fetch.py "$MAIN" --output "$DATA" --strict
+
+      - name: Commit the refreshed figures
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$DATA"
+          # Nothing to do if the file is byte-identical, which happens when
+          # this runs twice in a day and no count moved.  On the weekly
+          # schedule it will normally differ, because the fetcher records the
+          # date it confirmed the numbers and that line drives the package's
+          # "these figures are getting old" warning -- so a weekly one-line
+          # commit is the point rather than noise.
+          if git diff --quiet --cached -- "$DATA"; then
+            echo "unchanged; nothing to commit"
+            exit 0
+          fi
+          # [skip ci] keeps this from waking whatever else builds on push.
+          git commit -m "Refresh INSPIRE figures [skip ci]"
+          git push
+
+      # A per-run copy, so a run's log shows exactly what it fetched.  This is
+      # for you, not for Overleaf -- see the note at the top.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: inspirehep-data
+          path: ${{ env.DATA }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '## INSPIRE figures'
+            echo
+            if [ -f "$DATA" ]; then
+              echo '```'
+              grep -E '^\\inspiresetauthorstat|^\\inspiresetfetched' "$DATA" || true
+              echo '```'
+              echo "$(grep -c '^\\inspiresetcites' "$DATA") record(s) tracked."
+            else
+              echo 'The fetch produced nothing.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -146,6 +146,31 @@ spare — one line, axis lines only where they carry information, no grid, box,
 marks, or legend — and `\inspireplotstyle` takes any `pgfplots` axis keys if
 you want otherwise.
 
+## Keeping a document current automatically
+
+`example/refresh-inspire.yml` is a GitHub Actions workflow you can copy into
+your own repository. On a weekly schedule (and on a button) it runs the fetcher
+against your main `.tex`, commits the refreshed data file, and keeps a copy as a
+run artifact.
+
+The commit is the part that matters, because it gives the file a permanent raw
+URL:
+
+```
+https://raw.githubusercontent.com/<user>/<repo>/main/inspirehep-data.tex
+```
+
+In Overleaf, **Add file → From external URL** with that address, named
+`inspirehep-data.tex`. Overleaf then shows a **Refresh** button on that file,
+which re-fetches whatever the workflow last committed — so a CV kept on
+Overleaf stays current without you running anything.
+
+A workflow **artifact cannot be used** for this, which is why the workflow
+commits as well as uploading one: artifacts are served as ZIP archives rather
+than as the file itself, and downloading one needs an authenticated request even
+on a public repository. Overleaf issues a plain unauthenticated GET, so it would
+get neither the file nor permission.
+
 ## Install, other ways
 
 Step 1 above is the whole package: `inspirehep.sty` is all LaTeX needs, and
