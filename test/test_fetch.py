@@ -234,7 +234,19 @@ class Discover(unittest.TestCase):
         path.write_text(r"\documentclass{article}\begin{document}\end{document}",
                         encoding="utf-8")
         self.assertEqual(fetch.discover([path]),
-                         {"records": [], "plots": [], "bibtex": [], "authors": []})
+                         {"records": [], "plots": [], "bibtex": [], "authors": [],
+                          "collectionplot": False})
+
+    def test_notices_whether_a_collection_plot_is_drawn(self):
+        """The collection plot is the one command that costs an extra query,
+        so it is only fetched for a document that actually draws one."""
+        plain = self.dir / "plain.tex"
+        plain.write_text(r"\inspirepub{2642414}", encoding="utf-8")
+        self.assertFalse(fetch.discover([plain])["collectionplot"])
+        plotted = self.dir / "plotted.tex"
+        plotted.write_text(r"\inspirepub{2642414} \inspirecollectionplot",
+                           encoding="utf-8")
+        self.assertTrue(fetch.discover([plotted])["collectionplot"])
 
 
 class WriteIfChanged(unittest.TestCase):
@@ -304,10 +316,6 @@ class Render(unittest.TestCase):
         self.assertIn(r"\inspiresetfetched{", out)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class BibTargets(unittest.TestCase):
     """One BibTeX entry per record, however the document names it.
 
@@ -340,3 +348,108 @@ class BibTargets(unittest.TestCase):
 
     def test_nothing_wanted_is_nothing_fetched(self):
         self.assertEqual(fetch.bib_targets([], {}), {})
+
+
+class CollectionQuery(unittest.TestCase):
+    """The query goes into a data file that TeX reads, so its encoding is not
+    a free choice."""
+
+    def test_ors_every_record_together(self):
+        self.assertEqual(fetch.collection_query(["1", "2"]),
+                         "recid+1+or+recid+2")
+
+    def test_a_texkey_is_asked_for_as_a_texkey(self):
+        self.assertEqual(fetch.collection_query(["1701002", "Lee:2018pag"]),
+                         "recid+1701002+or+texkey+Lee:2018pag")
+
+    def test_one_paper_is_a_legitimate_collection(self):
+        self.assertEqual(fetch.collection_query(["1701002"]), "recid+1701002")
+
+    def test_carries_nothing_tex_would_reinterpret(self):
+        """Percent-encoding would be the obvious choice and is unusable: a `%'
+        in the data file comments out the rest of the line."""
+        query = fetch.collection_query(["1701002", "Lee:2018pag", "2642414"])
+        self.assertNotIn("%", query)
+        for hostile in "&#$_^~\\{} ":
+            self.assertNotIn(hostile, query,
+                             f"{hostile!r} would need escaping in TeX")
+
+
+class CollectionYears(unittest.TestCase):
+    r"""`refersto' has to be repeated in every clause.
+
+    Written once in front of a parenthesised list -- refersto (recid A or
+    recid B) -- INSPIRE accepts it and quietly means something far wider: for
+    a two-paper set it answered with 353,154 citing papers starting in 1900,
+    a plot of the right shape and four orders of magnitude wrong.
+    """
+
+    def setUp(self):
+        self.asked = []
+        real = fetch.fetch_years
+        self.addCleanup(setattr, fetch, "fetch_years", real)
+
+    def stub(self, pairs):
+        def fetch_years(query):
+            self.asked.append(query)
+            return pairs
+        fetch.fetch_years = fetch_years
+
+    def test_refersto_is_repeated_per_clause(self):
+        self.stub([("2020", 3)])
+        fetch.collection_years(["1", "2", "Lee:2018pag"])
+        query = self.asked[0]
+        self.assertEqual(query,
+                         "refersto recid 1 or refersto recid 2 "
+                         "or refersto texkey Lee:2018pag")
+        self.assertNotIn("(", query, "a parenthesised group means something else")
+        self.assertEqual(query.count("refersto"), 3)
+
+    def test_a_plausible_series_is_returned(self):
+        self.stub([("2019", 5), ("2020", 7)])
+        self.assertEqual(fetch.collection_years(["1"], citations=100),
+                         [("2019", 5), ("2020", 7)])
+
+    def test_refuses_a_series_far_larger_than_the_citations(self):
+        """A citing paper contributes at least one citation, so citing papers
+        cannot greatly outnumber them.  This is what catches the query above
+        having matched half the literature."""
+        self.stub([(str(y), 3000) for y in range(1900, 2026)])
+        with self.assertRaises(RuntimeError) as caught:
+            fetch.collection_years(["1", "2"], citations=2657)
+        self.assertIn("refersto", str(caught.exception))
+
+    def test_the_margin_is_wide_enough_for_a_small_collection(self):
+        """INSPIRE's stored counts and its reference index do disagree on
+        individual records, so a close call must not be refused."""
+        self.stub([("2020", 12)])
+        fetch.collection_years(["1"], citations=2)
+
+
+class RenderCollection(unittest.TestCase):
+    def test_declares_the_query_the_figures_and_the_series(self):
+        out = fetch.render({}, {}, {}, {}, None, collection={
+            "query": "recid+1+or+recid+2",
+            "stats": {"papers": 27, "citations": 2657, "hindex": 19},
+            "years": [("2019", 5), ("2020", 7)],
+        })
+        self.assertIn(r"\inspiresetcollectionquery{recid+1+or+recid+2}", out)
+        self.assertIn(r"\inspiresetcollection{hindex}{19}", out)
+        self.assertIn(r"\inspiresetcollection{papers}{27}", out)
+        self.assertIn(r"\inspiresetcollectionyears{(2019,5) (2020,7)}", out)
+
+    def test_the_query_survives_a_failed_lookup(self):
+        """It is built from what the document names, so a fetch that reached
+        nothing still leaves the link working."""
+        out = fetch.render({}, {}, {}, {}, None,
+                           collection={"query": "recid+1"})
+        self.assertIn(r"\inspiresetcollectionquery{recid+1}", out)
+        self.assertNotIn(r"\inspiresetcollection{", out)
+
+    def test_no_collection_declares_nothing(self):
+        out = fetch.render({}, {}, {}, {}, None)
+        self.assertNotIn("inspiresetcollection", out)
+
+
+if __name__ == "__main__":
+    unittest.main()

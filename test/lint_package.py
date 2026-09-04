@@ -145,6 +145,36 @@ def main() -> int:
                  f"control word's terminator, so no space is emitted -- use "
                  f"\\c_space_tl")
 
+    # Every URL the package builds must be flattened to catcode 12.  Under
+    # \ExplSyntaxOn a `:' is a letter, so `https:' does not read as a protocol
+    # and hyperref completes the target as a filename: dropping the flatten
+    # from \inspirehep_url:nN still turns every record link into
+    # inspirehep.net/literature/<id>.pdf, a page that does not exist, with no
+    # error anywhere.  Whether it bites depends on hyperref's guess about a
+    # given string -- a collection URL survives without it -- which is exactly
+    # why this is a rule rather than a judgement call at each site.
+    blocks = re.split(r"(?=\n\\(?:cs_new|prg_new|NewDocumentCommand))", sty_code)
+    for block in blocks:
+        if "https://inspirehep.net" not in block:
+            continue
+        if r"\tl_to_str:N" not in block:
+            name = re.search(r"\\(?:cs_new\w*:\w+|NewDocumentCommand)\s*\\?([\w:_]+)", block)
+            fail(f"{name.group(1) if name else 'a function'} builds an INSPIRE "
+                 f"URL without flattening it with \\tl_to_str:N; under "
+                 f"\\ExplSyntaxOn the `:' in `https:' is a letter, and hyperref "
+                 f"may then complete the target as a filename")
+
+    # An & in expl3 code is an alignment tab, catcode 4.  The one place the
+    # package needs an ampersand is a URL query (...&ui-citation-summary), and
+    # it writes \c_ampersand_str so the value is catcode 12 where it is built
+    # rather than relying on a later flatten to normalise it.  A literal & does
+    # survive that particular path today; this keeps the convention, and there
+    # is no legitimate bare & anywhere in this package.
+    for number, line in enumerate(sty_code.splitlines(), 1):
+        if "&" in line:
+            fail(f"inspirehep.sty:{number} has a bare & in expl3 code, where it "
+                 f"is an alignment tab; use \\c_ampersand_str")
+
     # pgfplots is optional and must stay behind the `plots' option, because
     # loading it costs every document that does not draw anything.
     for match in re.finditer(r"\\RequirePackage\s*\{\s*pgfplots\s*\}", sty):

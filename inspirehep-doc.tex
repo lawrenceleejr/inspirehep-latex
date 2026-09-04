@@ -377,6 +377,72 @@ with \opt{<key>} one of \opt{papers}, \opt{citations}, \opt{hindex}:
 \inspireauthorstat[round=1000]{1071846}{citations}
 \end{demo}
 
+\section{Collections}
+
+An author's INSPIRE profile covers everything with their name on it. In a large
+collaboration that is mostly papers they had no hand in, so a CV lists the
+subset they actually contributed to. The trouble is what happens next: the
+$h$-index in the summary line still comes from the profile, and so describes a
+set of papers that is not the list printed underneath it.
+
+A \emph{collection} closes that gap. The fetcher takes the records the document
+itself presents as its own --- everything typeset with \verb|\inspirepub| and
+its relatives, but not work merely cited with \verb|\inspirecite| --- and asks
+INSPIRE about exactly those, so the figures describe the list the reader is
+looking at:
+
+\begin{demo}
+\begin{tabular}{@{}lrrr@{}}
+              & papers & citations & $h$ \\
+  This manual & \inspirecollectionpapers
+              & \inspirecollectioncitations
+              & \inspirecollectionhindex
+\end{tabular}
+\end{demo}
+
+That is a far smaller number than the papers this manual names, and it is the
+default rule doing its job: most of them appear above as \verb|\inspirecite|
+examples, which a collection treats as somebody else's work, and another is the
+deliberately broken id from the missing-data section. An odd advertisement, but
+an honest demonstration --- on a CV the same rule leaves you with exactly your
+own publication list.
+
+INSPIRE does the arithmetic, through the same citation-summary aggregation
+behind its own profile pages, so an $h$-index here agrees with what a reader
+would get by running the search themselves. A record the search does not match
+is left out of all three figures rather than counted as having no citations,
+and the fetcher says so on the way past.
+
+\verb|\inspirecollectionstat{<key>}| is the general form behind the three, with
+\opt{<key>} one of \opt{papers}, \opt{citations}, \opt{hindex}. \opt{round=}
+works just as it does for a person.
+
+\subsection{The search itself}
+
+The point of a collection is that the reader can check it.
+\verb|\inspirecollectionlink{<text>}| puts it behind some words: one INSPIRE
+search, the OR of every paper in the collection, opening with the citation
+summary panel already showing.
+
+\begin{demo}
+\inspirecollectionlink{These papers on INSPIRE}
+\end{demo}
+
+\verb|\inspirecollectionurl| prints that search as itself instead, for a CV
+that would rather show the address than hide it. Either way \opt{summary=false}
+leaves INSPIRE's citation panel closed.
+
+The query is built from what the document names, which takes no network at
+all --- so the link still works after a failed fetch that left every count
+above unwritten.
+
+\subsection{Which papers are in it}
+
+By default the ones the document presents as its own. \verb|--collection all|
+takes every record it mentions, work it merely cites included;
+\verb|--collection none| skips the lookup. Nothing assumes the papers share an
+author: a collection can just as well be a group's output, or a single paper.
+
 \section{Plots}
 
 Load the package with the \opt{plots} option (it pulls in \pkg{pgfplots},
@@ -392,6 +458,15 @@ output or impact over time:
 
 \begin{demo}
 \inspireauthorplot{1071846}{papers}
+\end{demo}
+
+\verb|\inspirecollectionplot| is the same picture for a whole collection:
+citing papers per year across every paper in it, each citing paper counted once
+however many of them it cites --- which is how INSPIRE counts on its own author
+pages.
+
+\begin{demo}
+\inspirecollectionplot
 \end{demo}
 
 The default style is deliberately spare: one line, axis lines only where they
@@ -485,6 +560,8 @@ Option & Default & Meaning \\
                                 collaboration rather than to its first author \\
 \opt{link}      & \opt{true}  & hyperlink the title (needs \pkg{hyperref};
                                 plain text without it) \\
+\opt{summary}   & \opt{true}  & open a collection link with INSPIRE's
+                                citation summary already showing \\
 \opt{title}     & ---         & override the fetched title \\
 \opt{round}     & \opt{1}     & round a figure \emph{down} to a multiple of this \\
 \opt{mincites}  & \opt{1}     & counts below this print nothing \\
@@ -563,6 +640,9 @@ or patch anything by hand --- useful for records INSPIRE does not have:
 \verb|\inspiresetstat{<key>}{<n>}|            & the same, for the one person
                                                 named by \opt{--author} \\
 \verb|\inspiresetauthoryears{<id>}{<kind>}{...}| & a person's series \\
+\verb|\inspiresetcollection{<key>}{<n>}|      & a collection's figure \\
+\verb|\inspiresetcollectionquery{...}|        & the INSPIRE search behind it \\
+\verb|\inspiresetcollectionyears{(y,n) ...}|  & its citations per year \\
 \verb|\inspiresetfetched{<date>}{<dayno>}|    & when it was all fetched \\
 \bottomrule
 \end{tabular}

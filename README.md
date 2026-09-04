@@ -104,6 +104,44 @@ Over \inspirepapers[round=100]{1071846} papers, over
 `round=` rounds **down**, so a claim of "over N" stays true as the real figure
 grows.
 
+### Your papers, taken together
+
+An INSPIRE profile covers everything with your name on it. In a large
+collaboration that is mostly papers you had no hand in — so a CV lists the
+subset you actually contributed to, and then the *h*-index in the summary line
+describes a different set of papers from the list underneath it. For one real
+author profile:
+
+| | papers | citations | *h* |
+| --- | ---: | ---: | ---: |
+| the full INSPIRE profile | 1,470 | 208,033 | **211** |
+| the 27 papers on the CV | 27 | 2,657 | **19** |
+
+A *collection* is the second row. The fetcher takes the records your document
+presents as its own — everything you typeset with `\inspirepub` and its
+relatives, but not work you merely `\inspirecite` — and asks INSPIRE about
+exactly those:
+
+```latex
+\inspirecollectionpapers{} papers, \inspirecollectioncitations{} citations,
+$h$-index \inspirecollectionhindex{} —
+\inspirecollectionlink{see them all on INSPIRE}.
+```
+
+> 27 papers, 2,657 citations, *h*-index 19 — [see them all on INSPIRE](https://inspirehep.net/literature?q=recid+1191022+or+recid+1298030&ui-citation-summary=true).
+
+INSPIRE computes those figures itself, through the same citation-summary
+aggregation behind its own profile pages, so the *h*-index agrees with what a
+reader gets by running the search. And that is the useful part:
+`\inspirecollectionlink` is a single INSPIRE search — the OR of every paper in
+the collection — which opens with the citation summary already showing, so a
+reader can check the claim instead of taking it. `\inspirecollectionurl` prints
+that address as itself, and `\inspirecollectionplot` draws the collection's
+citations per year.
+
+The search is built from what your document names, so it needs no network: the
+link still works after a failed fetch that left every count unwritten.
+
 ### Citing a paper
 
 `\inspirecite` is `\cite` by INSPIRE id. The fetcher collects INSPIRE's own
@@ -314,6 +352,22 @@ so nothing has to be declared, and both link to the record by number.
 | `\inspirecite{<id>}` | `\cite` with that key |
 | `\inspireplot[<opts>]{<id>}` | citations per year, as a line |
 
+**Collections** — every paper the document presents as its own, taken together.
+No argument: the set comes from the document.
+
+| Command | Result |
+| --- | --- |
+| `\inspirecollectionpapers` | how many papers are in it |
+| `\inspirecollectioncitations` | their citations, in total |
+| `\inspirecollectionhindex` | their *h*-index |
+| `\inspirecollectionstat{<key>}` | the general form: `papers`, `citations`, `hindex` |
+| `\inspirecollectionlink{<text>}` | one INSPIRE search for all of them, behind that text |
+| `\inspirecollectionurl` | that search printed as an address |
+| `\inspirecollectionplot` | their citations per year, as a line |
+
+`--collection all` puts everything the document mentions in the collection,
+work it merely cites included; `--collection none` skips the lookup.
+
 `\inspirepub` takes options for exactly what it shows:
 
 ```latex
@@ -371,6 +425,7 @@ house style once and any one entry can depart from it.
 | `errata` | `false` | include any erratum in a reference |
 | `collab` | `false` | credit a collaboration paper to the collaboration rather than its first author |
 | `link` | `true` | hyperlink the title |
+| `summary` | `true` | open a collection link with INSPIRE's citation summary already showing |
 | `title` | *(none)* | override the fetched title |
 | `round` | `1` | round a figure down to a multiple of this |
 | `sep` | `comma` | thousands separator: `comma`, `period`, `space`, `thin`, `underscore`, `none`, or `sepstring={...}` for anything else |

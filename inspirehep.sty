@@ -69,6 +69,10 @@
     collab  .initial:n    = { false },
     link    .bool_set:N   = \l_inspirehep_link_bool,
     link    .initial:n    = { true },
+    % Open a collection link with INSPIRE's citation summary panel already
+    % showing, rather than making the reader find the switch.
+    summary .bool_set:N   = \l_inspirehep_summary_bool,
+    summary .initial:n    = { true },
     title   .tl_set:N     = \l_inspirehep_title_tl,
     title   .initial:n    = { },
     round   .int_set:N    = \l_inspirehep_round_int,
@@ -149,6 +153,11 @@
 \prop_new:N \g_inspirehep_years_prop
 \prop_new:N \g_inspirehep_stat_prop
 \prop_new:N \g_inspirehep_ayears_prop
+% A collection is every paper the document presents as its own, taken together:
+% one INSPIRE search, and the figures for that search rather than for a person.
+\prop_new:N \g_inspirehep_collection_prop
+\tl_new:N   \g_inspirehep_cquery_tl
+\tl_new:N   \g_inspirehep_cyears_tl
 \tl_new:N   \g_inspirehep_fetched_tl
 \int_new:N  \g_inspirehep_fetchedday_int
 
@@ -175,6 +184,9 @@
 \NewDocumentCommand \inspiresetstat       { m m }   { \prop_gput:Nnn \g_inspirehep_stat_prop  {#1} {#2} }
 \NewDocumentCommand \inspiresetauthorstat { m m m } { \prop_gput:Nnn \g_inspirehep_stat_prop  {#1/#2} {#3} }
 \NewDocumentCommand \inspiresetauthoryears { m m m } { \prop_gput:Nnn \g_inspirehep_ayears_prop {#1/#2} {#3} }
+\NewDocumentCommand \inspiresetcollection      { m m } { \prop_gput:Nnn \g_inspirehep_collection_prop {#1} {#2} }
+\NewDocumentCommand \inspiresetcollectionquery { m }   { \tl_gset:Nn \g_inspirehep_cquery_tl {#1} }
+\NewDocumentCommand \inspiresetcollectionyears { m }   { \tl_gset:Nn \g_inspirehep_cyears_tl {#1} }
 \NewDocumentCommand \inspiresetfetched    { m m }
   { \tl_gset:Nn \g_inspirehep_fetched_tl {#1} \int_gset:Nn \g_inspirehep_fetchedday_int {#2} }
 
@@ -229,6 +241,13 @@
 \cs_new:Npn \inspirehep_link:nn #1#2 { #2 }
 \AddToHook { begindocument }
   { \cs_if_exist:NT \href { \cs_gset:Npn \inspirehep_link:nn #1#2 { \href {#1} {#2} } } }
+
+% A URL shown as itself.  \url breaks it across lines and, under hyperref,
+% makes it clickable too; without either package a typewriter run is the most
+% that can be promised.
+\cs_new:Npn \inspirehep_nolink:n #1 { \texttt {#1} }
+\AddToHook { begindocument }
+  { \cs_if_exist:NT \url { \cs_gset:Npn \inspirehep_nolink:n #1 { \url {#1} } } }
 %% A record can be named either by its recid (2642414) or by its INSPIRE
 %% texkey (Lee:2018pag); the two are told apart by shape, so nothing has to be
 %% declared.  Lookups just use whichever string the document wrote, because the
@@ -452,6 +471,91 @@
 \NewDocumentCommand \inspirepapers    { O{} m } { \inspireauthorstat [#1] {#2} { papers    } }
 \NewDocumentCommand \inspirecitations { O{} m } { \inspireauthorstat [#1] {#2} { citations } }
 \NewDocumentCommand \inspirehindex    { O{} m } { \inspireauthorstat [#1] {#2} { hindex    } }
+
+%% ===========================================================================
+%% Collections
+%% ===========================================================================
+%% An author's INSPIRE profile covers everything with their name on it.  In a
+%% large collaboration that is mostly papers they had no hand in, so a CV lists
+%% the subset they actually contributed to -- and then the h-index on the page
+%% belongs to a different set of papers than the list beneath it.
+%%
+%% A collection closes that gap: the fetcher takes the records the document
+%% itself presents as its own and asks INSPIRE about exactly those, so the
+%% figures describe the list the reader is looking at.  \inspirecollectionlink
+%% hands the reader the same search, to check it for themselves.
+
+%% The query is built by the fetcher, which needs no network for it -- so the
+%% link survives an outage that leaves every count below unwritten.
+\cs_new_protected:Npn \inspirehep_collection_url:N #1
+  {
+    \tl_set:Nx #1
+      { https://inspirehep.net/literature?q= \g_inspirehep_cquery_tl }
+    \bool_if:NT \l_inspirehep_summary_bool
+      {
+        % A catcode-12 ampersand.  A literal & here is an alignment tab, and
+        % while the flattening below happens to normalise one, writing it this
+        % way means the value does not depend on that.
+        \tl_put_right:Nx #1 { \c_ampersand_str ui-citation-summary=true }
+      }
+    % Flatten to catcode 12, the same convention \inspirehep_url:nN follows and
+    % for the reason documented there -- under \ExplSyntaxOn a `:' is a letter,
+    % so `https:' does not read as a protocol and hyperref completes the target
+    % as a filename.  Removing it from \inspirehep_url:nN still reproduces that
+    % today; this URL survives without it, because hyperref's guess happens to
+    % fall the other way on a query string.  Both are hyperref heuristics, so
+    % neither is worth relying on: every URL the package builds gets flattened.
+    \tl_set:Nx #1 { \tl_to_str:N #1 }
+  }
+
+\prg_new_conditional:Npnn \inspirehep_collection_known: { TF }
+  {
+    \tl_if_empty:NTF \g_inspirehep_cquery_tl
+      { \prg_return_false: } { \prg_return_true: }
+  }
+
+%% \inspirecollectionurl -- the search itself, as text.
+\NewDocumentCommand \inspirecollectionurl { O{} }
+  {
+    \group_begin:
+      \keys_set:nn { inspirehep } {#1}
+      \inspirehep_collection_known:TF
+        {
+          \inspirehep_collection_url:N \l_inspirehep_url_tl
+          \exp_args:NV \inspirehep_nolink:n \l_inspirehep_url_tl
+        }
+        { \bool_gset_true:N \g_inspirehep_missing_bool \inspiremissing { collection } }
+    \group_end:
+  }
+
+%% \inspirecollectionlink[<options>]{<text>} -- that search, behind some words.
+\NewDocumentCommand \inspirecollectionlink { O{} m }
+  {
+    \group_begin:
+      \keys_set:nn { inspirehep } {#1}
+      \inspirehep_collection_known:TF
+        {
+          \inspirehep_collection_url:N \l_inspirehep_url_tl
+          \exp_args:NV \inspirehep_link:nn \l_inspirehep_url_tl {#2}
+        }
+        { #2 }
+    \group_end:
+  }
+
+%% \inspirecollectionstat[<options>]{papers|citations|hindex}
+\NewDocumentCommand \inspirecollectionstat { O{} m }
+  {
+    \group_begin:
+      \keys_set:nn { inspirehep } {#1}
+      \inspirehep_lookup:NnnTF \g_inspirehep_collection_prop {#2} \l_tmpa_tl
+        { \inspirenumformat { \inspirehep_round:n { \l_tmpa_tl } } }
+        { \inspiremissing { collection~#2 } }
+    \group_end:
+  }
+
+\NewDocumentCommand \inspirecollectionpapers    { O{} } { \inspirecollectionstat [#1] { papers    } }
+\NewDocumentCommand \inspirecollectioncitations { O{} } { \inspirecollectionstat [#1] { citations } }
+\NewDocumentCommand \inspirecollectionhindex    { O{} } { \inspirecollectionstat [#1] { hindex    } }
 \ExplSyntaxOff
 
 \ExplSyntaxOn
@@ -538,6 +642,22 @@
       \inspirehep_lookup:NnnTF \g_inspirehep_ayears_prop {#2/#3} \l_tmpa_tl
         { \inspirehep_draw:nn { \l_tmpa_tl } {#3} }
         { \inspiremissing { plot~#2/#3 } }
+    \group_end:
+  }
+
+%% \inspirecollectionplot[<options>] -- citing papers per year, across every
+%% paper in the collection.  A paper that cites three of them counts once,
+%% which is how INSPIRE counts on its own author pages.
+\NewDocumentCommand \inspirecollectionplot { O{} }
+  {
+    \group_begin:
+      \keys_set:nn { inspirehep } {#1}
+      \tl_if_empty:NTF \g_inspirehep_cyears_tl
+        {
+          \bool_gset_true:N \g_inspirehep_missing_bool
+          \inspiremissing { collection~plot }
+        }
+        { \inspirehep_draw:nn { \g_inspirehep_cyears_tl } { citations } }
     \group_end:
   }
 

@@ -32,6 +32,10 @@ if [ "$mode" = --no-data ]; then
         || fail 'expected a [? ...] marker for every figure with no data file'
     echo "$text" | grep -qE '\[[0-9]+ citations?\]' \
         && fail 'a citation count appeared with no data file'
+    # A collection knows nothing either, and must say so rather than draw a
+    # link to a search with no records in it.
+    echo "$text" | grep -qE '\[\?[[:space:]]*collection' \
+        || fail 'expected a [? collection ...] marker with no data file'
     echo 'OK: still a PDF, and it says what it does not know'
     exit 0
 fi
@@ -69,6 +73,16 @@ if command -v pdftohtml >/dev/null 2>&1; then
     bad=$(echo "$links" | grep -E 'inspirehep\.net/literature/[^/]*[^0-9]$' || true)
     [ -z "$bad" ] || { echo "FAIL: malformed INSPIRE record link:" >&2
                        echo "$bad" >&2; exit 1; }
+    # The collection link: one search that is the OR of every paper listed.
+    # It is the only link here that is a query rather than a record, and the
+    # only one carrying an ampersand -- which is why it is worth asserting
+    # separately from the record links above.
+    collection=$(echo "$links" | grep -E 'inspirehep\.net/literature\?q=' || true)
+    [ -n "$collection" ] || fail 'no collection search link'
+    echo "$collection" | grep -q '+or+' \
+        || fail "the collection link is not an OR of several records: $collection"
+    echo "$collection" | grep -q 'ui-citation-summary=true' \
+        || fail "the collection link does not open the citation summary: $collection"
 fi
 
 # A full reference, as INSPIRE renders it.
