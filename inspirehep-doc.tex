@@ -413,9 +413,22 @@ would get by running the search themselves. A record the search does not match
 is left out of all three figures rather than counted as having no citations,
 and the fetcher says so on the way past.
 
-\verb|\inspirecollectionstat{<key>}| is the general form behind the three, with
-\opt{<key>} one of \opt{papers}, \opt{citations}, \opt{hindex}. \opt{round=}
-works just as it does for a person.
+\verb|\inspirecollectionstat{<key>}| is the general form behind these, with
+\opt{<key>} one of \opt{papers}, \opt{citations}, \opt{hindex}, \opt{gindex}.
+\opt{round=} works just as it does for a person.
+
+\verb|\inspirecollectiongindex| is the one figure INSPIRE does not supply: its
+citation summary carries an $h$-index and no $g$-index, so the fetcher works
+Egghe's $g$ out from the same per-record counts --- the largest $g$ whose top
+$g$ papers have $g^2$ citations between them. Recomputing $h$ from those counts
+reproduces exactly what INSPIRE returns, which is the reason to trust them for
+$g$ as well.
+
+Worth knowing before it goes on a page: $g$ can never exceed the number of
+papers, so on a short list it saturates and simply reports that length. A
+27-paper CV with 2{,}657 citations has $g=27$, because 2{,}657 clears
+$27^2=729$ without difficulty. A $g$-index only starts saying something once
+the list is long enough for the cumulative count to fall behind $g^2$.
 
 \subsection{The search itself}
 

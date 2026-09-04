@@ -85,6 +85,11 @@ if command -v pdftohtml >/dev/null 2>&1; then
         || fail "the collection link does not open the citation summary: $collection"
 fi
 
+# The collection's own figures, including the g-index -- the one number here
+# that is computed rather than fetched, so the one that can be wrong alone.
+echo "$text" | grep -qE 'g-index[^0-9]*[0-9]' \
+    || fail 'no collection g-index'
+
 # A full reference, as INSPIRE renders it.
 echo "$text" | grep -q 'Prog. Part. Nucl. Phys.' \
     || fail 'no formatted reference'

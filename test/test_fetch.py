@@ -426,11 +426,51 @@ class CollectionYears(unittest.TestCase):
         fetch.collection_years(["1"], citations=2)
 
 
+class GIndex(unittest.TestCase):
+    """Egghe's g-index: the largest g whose top g papers carry g^2 citations.
+
+    INSPIRE publishes no g-index, so unlike every other figure here this one is
+    computed rather than fetched -- which makes it the one that can be wrong on
+    its own.
+    """
+
+    def test_the_worked_example(self):
+        # 9,18,...,81 against 1,4,...,81: g=9 holds, g=10 needs 100 and has 90.
+        self.assertEqual(fetch.g_index([9] * 12), 9)
+
+    def test_stops_where_the_cumulative_count_falls_behind(self):
+        self.assertEqual(fetch.g_index([5, 1, 1]), 2)   # 7 citations, 3^2 = 9
+
+    def test_order_does_not_matter(self):
+        self.assertEqual(fetch.g_index([1, 5, 1]), fetch.g_index([5, 1, 1]))
+
+    def test_saturates_on_a_short_list(self):
+        """g cannot exceed the number of papers, so a CV-length list of
+        well-cited papers returns its own length.  Documented, not a bug."""
+        counts = [408, 319, 261, 260, 248, 152, 146, 135, 119, 108, 103, 100,
+                  83, 50, 33, 28, 27, 23, 22, 13, 9, 4, 3, 2, 1, 0, 0]
+        self.assertEqual(fetch.g_index(counts), len(counts))
+
+    def test_reproduces_inspires_h_index_from_the_same_counts(self):
+        """Not a g-index test as such: it is the reason these counts are
+        trusted for g.  INSPIRE's facet gives h=19 for exactly this set."""
+        counts = [408, 319, 261, 260, 248, 152, 146, 135, 119, 108, 103, 100,
+                  83, 50, 33, 28, 27, 23, 22, 13, 9, 4, 3, 2, 1, 0, 0]
+        ordered = sorted(counts, reverse=True)
+        h = max((i for i, c in enumerate(ordered, 1) if c >= i), default=0)
+        self.assertEqual(h, 19)
+
+    def test_nothing_cited_is_zero(self):
+        self.assertEqual(fetch.g_index([]), 0)
+        self.assertEqual(fetch.g_index([0, 0]), 0)
+
+
 class RenderCollection(unittest.TestCase):
     def test_declares_the_query_the_figures_and_the_series(self):
         out = fetch.render({}, {}, {}, {}, None, collection={
             "query": "recid+1+or+recid+2",
-            "stats": {"papers": 27, "citations": 2657, "hindex": 19},
+            "stats": {"papers": 27, "citations": 2657, "hindex": 19,
+                      "gindex": 27},
             "years": [("2019", 5), ("2020", 7)],
         })
         self.assertIn(r"\inspiresetcollectionquery{recid+1+or+recid+2}", out)

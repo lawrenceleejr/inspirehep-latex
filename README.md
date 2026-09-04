@@ -142,6 +142,14 @@ citations per year.
 The search is built from what your document names, so it needs no network: the
 link still works after a failed fetch that left every count unwritten.
 
+One caveat on `\inspirecollectiongindex`. INSPIRE publishes no *g*-index, so it
+is computed from the same per-record counts INSPIRE's *h*-index comes from
+(recomputing *h* from them reproduces INSPIRE's answer exactly). But *g* can
+never exceed the number of papers, so on a short list it saturates and just
+reports that length — 27 papers with 2,657 citations gives *g* = 27, since
+2,657 clears 27² = 729 easily. It starts to mean something only once the list
+is long enough for the cumulative count to fall behind *g*².
+
 ### Citing a paper
 
 `\inspirecite` is `\cite` by INSPIRE id. The fetcher collects INSPIRE's own
@@ -359,8 +367,9 @@ No argument: the set comes from the document.
 | --- | --- |
 | `\inspirecollectionpapers` | how many papers are in it |
 | `\inspirecollectioncitations` | their citations, in total |
-| `\inspirecollectionhindex` | their *h*-index |
-| `\inspirecollectionstat{<key>}` | the general form: `papers`, `citations`, `hindex` |
+| `\inspirecollectionhindex` | their *h*-index, as INSPIRE computes it |
+| `\inspirecollectiongindex` | their *g*-index, which INSPIRE does not publish |
+| `\inspirecollectionstat{<key>}` | the general form: `papers`, `citations`, `hindex`, `gindex` |
 | `\inspirecollectionlink{<text>}` | one INSPIRE search for all of them, behind that text |
 | `\inspirecollectionurl` | that search printed as an address |
 | `\inspirecollectionplot` | their citations per year, as a line |

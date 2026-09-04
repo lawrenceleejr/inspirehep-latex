@@ -330,6 +330,30 @@ def collection_summary(ids: list[str]) -> dict[str, int]:
     }
 
 
+def g_index(counts: list[int]) -> int:
+    """Egghe's g-index: the largest g such that the top g papers have at least
+    g^2 citations between them.
+
+    INSPIRE does not publish one -- its citation summary carries only an
+    h-index -- so this is worked out here, from the per-record counts the
+    fetcher already has.  Those are the same numbers INSPIRE's own h-index
+    comes from: recomputing h from them reproduces what the facet returns.
+
+    Note that g cannot exceed the number of papers, so on a short list it
+    saturates and simply reports the list's length.  That is the definition
+    behaving as intended on a truncated set, not a bug, but it does mean a
+    g-index says little until a list is long enough for the cumulative count
+    to stop keeping up with g^2.
+    """
+    running = 0
+    best = 0
+    for rank, count in enumerate(sorted(counts, reverse=True), 1):
+        running += count
+        if running >= rank * rank:
+            best = rank
+    return best
+
+
 def collection_years(ids: list[str], citations: int | None = None) -> list[tuple[str, int]]:
     """Citing papers per year, across a whole set of records.
 
@@ -591,6 +615,12 @@ def main(argv: list[str] | None = None) -> int:
         collection["query"] = collection_query(collection_ids)
         stats = attempt("collection", collection_summary, collection_ids)
         if stats is not None:
+            # h comes from INSPIRE; g is not on offer there, so it is computed
+            # from the counts already fetched for these same records.  A record
+            # INSPIRE did not match is absent from `records' and so drops out of
+            # both, which is what the `papers' figure already reports.
+            stats["gindex"] = g_index([records[i]["cites"] for i in collection_ids
+                                       if i in records])
             collection["stats"] = stats
         if wanted["collectionplot"]:
             years = attempt("collection plot", collection_years, collection_ids,
@@ -618,7 +648,10 @@ def main(argv: list[str] | None = None) -> int:
               f"h-index {stat['hindex']}")
     if stats := collection.get("stats"):
         print(f"    collection of {len(collection_ids)}: {stats['papers']:,} papers, "
-              f"{stats['citations']:,} citations, h-index {stats['hindex']}")
+              f"{stats['citations']:,} citations, h-index {stats['hindex']}, "
+              f"g-index {stats['gindex']}"
+              + (" (saturated: g cannot exceed the number of papers)"
+                 if stats["gindex"] >= stats["papers"] > 0 else ""))
     print(f"{'Updated' if changed else 'Unchanged'}: {args.output}")
 
     if bibs:

@@ -542,7 +542,7 @@
     \group_end:
   }
 
-%% \inspirecollectionstat[<options>]{papers|citations|hindex}
+%% \inspirecollectionstat[<options>]{papers|citations|hindex|gindex}
 \NewDocumentCommand \inspirecollectionstat { O{} m }
   {
     \group_begin:
@@ -556,6 +556,11 @@
 \NewDocumentCommand \inspirecollectionpapers    { O{} } { \inspirecollectionstat [#1] { papers    } }
 \NewDocumentCommand \inspirecollectioncitations { O{} } { \inspirecollectionstat [#1] { citations } }
 \NewDocumentCommand \inspirecollectionhindex    { O{} } { \inspirecollectionstat [#1] { hindex    } }
+% INSPIRE publishes no g-index, so the fetcher computes this one from the same
+% per-record counts its h-index comes from.  Worth knowing before it goes on a
+% page: g cannot exceed the number of papers, so on a short list it saturates
+% and reports that length back.
+\NewDocumentCommand \inspirecollectiongindex    { O{} } { \inspirecollectionstat [#1] { gindex    } }
 \ExplSyntaxOff
 
 \ExplSyntaxOn
